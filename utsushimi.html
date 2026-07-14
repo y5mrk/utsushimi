@@ -94,6 +94,28 @@
   #welcomeWrap,#inviteWrap{text-align:center; margin-top:22px;}
   #welcomeWrap p,#inviteWrap p{font-size:13px; color:var(--ink-soft); margin-bottom:10px;}
 
+  /* ---------- 村の掲示板 ---------- */
+  #bulletinBoard{
+    background:var(--card); border:1px solid var(--line); border-radius:18px;
+    padding:20px 24px 22px; margin-top:48px; box-shadow:0 4px 16px rgba(60,50,35,.06);
+  }
+  .bbTitle{ font-size:13.5px; letter-spacing:.22em; color:var(--accent-dark); font-weight:600; }
+  .bbNav{ display:flex; align-items:center; justify-content:center; gap:14px; margin:5px 0 14px; }
+  .bbDate{ font-size:12px; color:var(--ink-soft); }
+  .bbArrow{ flex-shrink:0; background:none; border:1px solid var(--line); border-radius:999px;
+    width:26px; height:26px; font-size:15px; line-height:1; color:var(--ink-soft);
+    display:flex; align-items:center; justify-content:center; transition:all .2s ease; }
+  .bbArrow:hover:not(:disabled){ border-color:var(--accent); color:var(--ink); }
+  .bbArrow:disabled{ opacity:.32; cursor:default; }
+  #bbList{ display:flex; flex-direction:column; gap:10px; }
+  .bbItem{ display:flex; gap:14px; align-items:baseline; padding-bottom:10px; border-bottom:1px dashed var(--line); }
+  .bbItem:last-child{ border-bottom:none; padding-bottom:0; }
+  .bbTime{ flex-shrink:0; font-size:12px; color:var(--ink-soft); letter-spacing:.03em; font-variant-numeric:tabular-nums; }
+  .bbText{ font-size:14px; line-height:1.8; }
+  .bbMsg{ font-size:13px; color:var(--ink-soft); text-align:center; padding:10px 0; }
+  .bbMsg.bbErr{ color:var(--warn); }
+  .bbMsg .miniBtn{ margin-left:10px; }
+
   /* ---------- write ---------- */
   #faceStrip{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px;}
   #faceStrip button{background:none; border:1px solid transparent; border-radius:8px; padding:2px;}
@@ -255,7 +277,7 @@
   .sect h3{ letter-spacing:.28em; }
 
   /* 村の下の一言 */
-  #countdown{ font-size:12.5px; letter-spacing:.08em; opacity:.82; margin-bottom:16px; }
+  #countdown{ font-size:12.5px; letter-spacing:.08em; opacity:.82; margin-top:4px; margin-bottom:16px; }
 
   /* 設定画面のトーン */
   #setup{ max-width:660px; padding:76px 28px; }
@@ -348,6 +370,15 @@
         <span class="season" id="clockSeason"></span>
       </div>
       <div id="figureLayer"></div>
+    </div>
+    <div id="bulletinBoard">
+      <div class="bbTitle">村の掲示板</div>
+      <div class="bbNav">
+        <button class="bbArrow" id="bbPrev" aria-label="前の日">‹</button>
+        <div class="bbDate" id="bbDate"></div>
+        <button class="bbArrow" id="bbNext" aria-label="次の日">›</button>
+      </div>
+      <div id="bbList"></div>
     </div>
     <div id="welcomeWrap" style="display:none">
       <p>一週間がたちました。だれかが、村の入口に立っています。</p>
@@ -468,8 +499,19 @@ let curVillager = -1;       // モーダルで開いている村人のindex
 let selectedViewpoints = []; // 執筆中に選択している視点人物（村人indexの配列）
 let activeTagFilters = [];   // 書きだめ帳の絞り込みに使う視点人物タグ（村人indexの配列）
 let activeAuthorFilters = []; // 書きだめ帳の絞り込みに使う執筆者タグ（"あなた"などの文字列の配列）
+let bbBusy = false;  // 村の掲示板を生成中かどうか
+let bbError = null;  // 村の掲示板の生成エラーメッセージ
+let bbViewIndex = null; // 掲示板の閲覧位置（state.bulletinLogのindex）。nullなら常に最新を自動追従。
 
-function load(){ try{ state = JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){ state=null; } if(state){ state.mode = "api"; state.portraits = state.portraits || {}; } }
+function load(){
+  try{ state = JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){ state=null; }
+  if(state){
+    state.mode = "api";
+    state.portraits = state.portraits || {};
+    state.bulletinLog = state.bulletinLog || [];
+    state.bulletinLog.sort((a,b) => a.date.localeCompare(b.date));
+  }
+}
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 
 const WEEK = 7*24*60*60*1000;
@@ -640,6 +682,35 @@ ${COMMON_RULES}
 ${VILLAGER_SCHEMA}`;
 }
 
+function buildBulletinPrompt(targetDateJP, prevBoard){
+  const prevNote = (prevBoard && prevBoard.events.length)
+    ? `\n# 前回の掲示板（参考。同じ出来事を繰り返さないこと）\n${prevBoard.events.map(e => `- ${e.time ? e.time+" " : ""}${e.text}`).join("\n")}\n`
+    : "";
+  return `「${state.villageName}」（${state.villageDescription||""}）という村で、${targetDateJP}に起きた、村の掲示板に貼り出すようなちょっとした事件やできごとを2〜4件考えてください。
+
+# いまの村人たち
+${villagerSummary()}
+
+# これまでにユーザーが書いた物語
+${novelContext()}
+${prevNote}
+# 生成のルール
+- 村人の設定やこれまでの物語と大きく矛盾しないこと（死んだはずの人物が元気に動き回る、確定した事実と衝突する、など）。
+- ただし、物語の続きやオチをつけるような出来事を作ってはならない。物語はあくまで「矛盾を避けるための確認」に使うこと。
+- 村人が関わらない、天気や動物、道具など村の空気を感じさせる些細な出来事も歓迎する。
+- 一人の村人に偏らず、複数の村人が織り交ざるようにすること。
+- 内容（text）は掲示板の一文告知のように短く具体的に（1〜2文）。
+- 時刻（time）は "HH:MM" の24時間表記。4件なら4件とも別々の時間帯に散らすこと。
+- 出力は有効なJSONのみ。コードブロックや説明文をつけないこと。
+
+# 出力形式（JSONのみ）
+{
+  "events": [
+    { "time": "HH:MM", "text": "できごとの内容（1〜2文）" }
+  ]
+}`;
+}
+
 /* =====================================================
    検証
 ===================================================== */
@@ -654,6 +725,14 @@ function validInitial(raw){
 function validOne(raw){
   const v = (raw.villagers && raw.villagers[0]) || raw.villager || raw;
   validVillager(v);
+}
+function validBulletin(raw){
+  if(!raw || !Array.isArray(raw.events) || !raw.events.length)
+    throw new Error("掲示板の内容が読み取れませんでした。");
+  raw.events.forEach(e => {
+    if(!e || typeof e.text !== "string" || !e.text.trim())
+      throw new Error("掲示板の内容が読み取れませんでした。");
+  });
 }
 function extractJSON(text){
   const s = text.indexOf("{"), e = text.lastIndexOf("}");
@@ -908,6 +987,46 @@ function portraitHTML(v){
 function fmtDate(t){
   const d = new Date(t);
   return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+}
+
+/* 掲示板：日付まわり（"村の時間"＝実時間なので、実カレンダー上の前日を対象にする） */
+function dateKey(d){
+  const p = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+function bulletinTargetDate(){
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return dateKey(d);
+}
+/* 村の生成日〜前日のうち、まだ掲示板が無い日付を古い順に列挙する */
+function bulletinPendingDates(){
+  if(!state) return [];
+  const target = bulletinTargetDate();
+  const createdKey = dateKey(new Date(state.createdAt));
+  if(target < createdKey) return [];
+  const created = new Date(state.createdAt);
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const start = created > weekAgo ? created : weekAgo; // 村の生成日が7日より前の場合、遡るのは最大7日分まで
+  start.setHours(0,0,0,0);
+  const have = new Set((state.bulletinLog||[]).map(b => b.date));
+  const pending = [];
+  const d = new Date(start);
+  while(dateKey(d) <= target){
+    const key = dateKey(d);
+    if(!have.has(key)) pending.push(key);
+    d.setDate(d.getDate() + 1);
+  }
+  return pending;
+}
+function fmtDateKeyJP(key){
+  const [y,m,d] = key.split("-").map(Number);
+  return `${y}年${m}月${d}日`;
+}
+function normTime(t){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t||"").trim());
+  return m ? String(m[1]).padStart(2,"0") + ":" + m[2] : "";
 }
 
 /* =====================================================
@@ -1182,6 +1301,48 @@ function renderCountdown(){
   el.textContent = `つぎの村人がやってくるまで、あと${d}日と${h}時間`;
 }
 
+function renderBulletin(){
+  if(!state) return;
+  const log = state.bulletinLog || [];
+  const target = bulletinTargetDate();
+  const pinned = bbViewIndex !== null && bbViewIndex >= 0 && bbViewIndex < log.length;
+  const board = pinned ? log[bbViewIndex] : (log.length ? log[log.length-1] : null);
+  const showingLive = !pinned; // 最新（生成中・失敗の可能性がある枠）を見ているか
+
+  $("bbDate").textContent = fmtDateKeyJP(board ? board.date : target) + "のできごと";
+  const curIdx = pinned ? bbViewIndex : log.length - 1;
+  $("bbPrev").disabled = curIdx <= 0;
+  $("bbNext").disabled = !pinned;
+
+  const list = $("bbList");
+  list.innerHTML = "";
+
+  if(showingLive){
+    if(bbBusy){ list.innerHTML = `<div class="bbMsg">掲示板を書いています…</div>`; return; }
+    if(bbError){
+      list.innerHTML = `<div class="bbMsg bbErr">${esc(bbError)}<button class="miniBtn" id="bbRetry">再試行</button></div>`;
+      $("bbRetry").onclick = () => checkBulletin(); // 残っている未生成分から再開
+      return;
+    }
+    if(!board){
+      const createdKey = dateKey(new Date(state.createdAt));
+      list.innerHTML = target < createdKey
+        ? `<div class="bbMsg">村ができたばかりで、まだ掲示板には何も貼られていません。</div>`
+        : `<div class="bbMsg">きょうの掲示板は、まだ届いていません。</div>`;
+      return;
+    }
+  }
+
+  if(!board){ list.innerHTML = `<div class="bbMsg">まだ掲示板はありません。</div>`; return; }
+
+  board.events.forEach(e => {
+    const row = document.createElement("div");
+    row.className = "bbItem";
+    row.innerHTML = (e.time ? `<span class="bbTime">${esc(e.time)}</span>` : "") + `<span class="bbText">${esc(e.text)}</span>`;
+    list.appendChild(row);
+  });
+}
+
 function renderFaceStrip(){
   const s = $("faceStrip");
   s.innerHTML = "";
@@ -1194,7 +1355,7 @@ function renderFaceStrip(){
   });
 }
 
-function renderAll(){ renderHeader(); renderVillage(); renderFaceStrip(); }
+function renderAll(){ renderHeader(); renderVillage(); renderFaceStrip(); renderBulletin(); }
 
 /* 執筆画面：視点人物のトグル選択 */
 function renderViewpointStrip(){
@@ -1401,6 +1562,42 @@ async function weeklyCheck(){
   }
 }
 
+/* 村の掲示板：村の生成日〜前日のうち未生成の日があれば、まとめて自動で書いてもらう */
+async function checkBulletin(){
+  if(!state || !state.villagers.length || bbBusy) return;
+  const pending = bulletinPendingDates();
+  if(!pending.length){ renderBulletin(); return; }
+  await generateBulletinRange(pending);
+}
+
+async function generateBulletinRange(dates){
+  bbBusy = true;
+  bbError = null;
+  renderBulletin();
+  const log = state.bulletinLog || (state.bulletinLog = []);
+  try{
+    for(const target of dates){
+      const prevBoard = log.length ? log[log.length-1] : null;
+      const raw = await callClaude(buildBulletinPrompt(fmtDateKeyJP(target), prevBoard), 1500);
+      validBulletin(raw);
+      const events = raw.events
+        .filter(e => e && e.text)
+        .map(e => ({ time: normTime(e.time), text: String(e.text).trim() }))
+        .sort((a,b) => (a.time || "99:99").localeCompare(b.time || "99:99"));
+      const entry = { date: target, events, generatedAt: Date.now() };
+      const existingIdx = log.findIndex(b => b.date === target);
+      if(existingIdx >= 0) log[existingIdx] = entry; else log.push(entry);
+      log.sort((a,b) => a.date.localeCompare(b.date)); // 常にdate昇順を保つ
+      save(); // 1日ぶん書けるたびに保存。途中で失敗しても、そこまでは残る
+    }
+  }catch(err){
+    bbError = err.message || "掲示板を書けませんでした。";
+  }finally{
+    bbBusy = false;
+    renderBulletin();
+  }
+}
+
 /* 手動モード：一週間経過後の「迎えにいく」 */
 async function welcome(){
   if(busy) return;
@@ -1604,6 +1801,19 @@ $("pfpClear").onclick = () => {
 
 $("welcomeBtn").onclick = welcome;
 $("inviteBtn").onclick = invite;
+
+/* 村の掲示板：過去の日付を遡る／最新に戻る */
+$("bbPrev").onclick = () => {
+  const log = state.bulletinLog || [];
+  const curIdx = (bbViewIndex !== null && bbViewIndex < log.length) ? bbViewIndex : log.length - 1;
+  if(curIdx > 0){ bbViewIndex = curIdx - 1; renderBulletin(); }
+};
+$("bbNext").onclick = () => {
+  const log = state.bulletinLog || [];
+  if(bbViewIndex === null) return;
+  bbViewIndex = (bbViewIndex < log.length - 1) ? bbViewIndex + 1 : null;
+  renderBulletin();
+};
 $("retryBtn").onclick = () => { hideError(); if(lastFailedJob) lastFailedJob(); };
 $("readerBack").onclick = renderLibrary;
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => closeModal(b.dataset.close));
@@ -1630,9 +1840,11 @@ function enterApp(){
   renderAll();
   tickClock();
   weeklyCheck();
+  checkBulletin();
   setInterval(tickClock, 1000);
   setInterval(renderCountdown, 30000);
   setInterval(weeklyCheck, 60000);
+  setInterval(checkBulletin, 5*60*1000);
 }
 
 applyTheme(); // 設定画面の段階から季節の配色を反映
