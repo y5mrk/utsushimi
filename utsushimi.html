@@ -277,6 +277,33 @@
   #arrivalModal .pfp{ width:130px; height:auto; margin:10px auto; }
   .pfpCtl{ display:flex; align-items:center; gap:8px 10px; flex-wrap:wrap; margin:2px 0 14px; }
   .pfpNote{ font-size:11.5px; color:var(--ink-soft); line-height:1.5; }
+
+  /* 視点人物ピッカー（執筆画面） */
+  .vpLabel{ font-size:12px; color:var(--ink-soft); letter-spacing:.1em; margin:2px 0 6px; }
+  #viewpointPicker{ margin-bottom:16px; }
+  #viewpointStrip{ display:flex; gap:8px; flex-wrap:wrap; }
+  .vpBtn{ background:none; border:1px solid var(--line); border-radius:10px; padding:5px 9px 4px; text-align:center; transition:all .2s ease; }
+  .vpBtn:hover{ border-color:var(--accent); }
+  .vpBtn svg, .vpBtn .pfp{ width:38px; height:auto; display:block; margin:0 auto;
+    filter:drop-shadow(0 2px 3px rgba(30,35,45,.18)); }
+  .vpBtn .nm{ font-size:11px; letter-spacing:.05em; display:block; margin-top:3px; color:var(--ink-soft); }
+  .vpBtn.active{ border-color:var(--accent); background:rgba(90,125,90,.12); }
+  .vpBtn.active .nm{ color:var(--ink); }
+
+  /* タグ（書きだめ帳・リーダー） */
+  #tagFilterRow{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+  .tagChip{ background:var(--card); border:1px solid var(--line); border-radius:999px;
+    padding:4px 15px; font-size:12px; color:var(--ink-soft); letter-spacing:.06em; transition:all .2s ease; }
+  .tagChip:hover{ border-color:var(--accent); }
+  .tagChip.active{ border-color:var(--accent); background:var(--accent); color:#fdfbf4; }
+  .tagChip.clearChip{ color:var(--warn); border-color:#c8a08a; }
+  .novelItem .tags{ margin-top:8px; display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+  .tagGroupLabel{ font-size:10.5px; color:var(--ink-soft); letter-spacing:.08em; margin-right:-1px; }
+  .tagGroupLabel:not(:first-child){ margin-left:5px; }
+  .tagBadge{ display:inline-block; background:var(--paper2); border-radius:999px;
+    padding:2px 11px; font-size:11px; color:var(--ink-soft); letter-spacing:.05em; }
+  .tagBadge.author{ background:var(--accent); color:#fdfbf4; }
+  #readerTags{ margin:-8px 0 18px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 </style>
 </head>
 <body>
@@ -335,6 +362,10 @@
   <section id="writeView" style="display:none">
     <div id="faceStrip"></div>
     <input id="novelTitle" placeholder="題（なくてもよい）">
+    <div id="viewpointPicker">
+      <div class="vpLabel">視点人物（複数選択可）</div>
+      <div id="viewpointStrip"></div>
+    </div>
     <textarea id="novelBody" placeholder="ここに、彼らの物語を。"></textarea>
     <div class="actions">
       <button class="primary" id="saveNovelBtn" style="margin:0">書きとめる</button>
@@ -344,11 +375,13 @@
   </section>
 
   <section id="libraryView" style="display:none">
+    <div id="tagFilterRow"></div>
     <div id="novelList"></div>
     <div id="reader">
       <button class="back" id="readerBack">← 書きだめ帳にもどる</button>
       <h2 id="readerTitle"></h2>
       <div class="meta" id="readerMeta"></div>
+      <div class="tags" id="readerTags"></div>
       <button class="miniBtn" id="readerEdit" style="margin-bottom:16px">編集する</button>
       <div class="body" id="readerBody"></div>
     </div>
@@ -432,6 +465,9 @@ let lastFailedJob = null;
 let editingId = null;      // 編集中の物語ID（新規のときは null）
 let currentReaderId = null; // いま開いている物語ID
 let curVillager = -1;       // モーダルで開いている村人のindex
+let selectedViewpoints = []; // 執筆中に選択している視点人物（村人indexの配列）
+let activeTagFilters = [];   // 書きだめ帳の絞り込みに使う視点人物タグ（村人indexの配列）
+let activeAuthorFilters = []; // 書きだめ帳の絞り込みに使う執筆者タグ（"あなた"などの文字列の配列）
 
 function load(){ try{ state = JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){ state=null; } if(state){ state.mode = "api"; state.portraits = state.portraits || {}; } }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
@@ -1160,33 +1196,128 @@ function renderFaceStrip(){
 
 function renderAll(){ renderHeader(); renderVillage(); renderFaceStrip(); }
 
+/* 執筆画面：視点人物のトグル選択 */
+function renderViewpointStrip(){
+  const s = $("viewpointStrip");
+  s.innerHTML = "";
+  state.villagers.forEach((v,i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "vpBtn" + (selectedViewpoints.includes(i) ? " active" : "");
+    b.innerHTML = portraitHTML(v) + `<span class="nm">${esc(v.name)}</span>`;
+    b.onclick = () => {
+      const idx = selectedViewpoints.indexOf(i);
+      if(idx >= 0) selectedViewpoints.splice(idx,1); else selectedViewpoints.push(i);
+      renderViewpointStrip();
+    };
+    s.appendChild(b);
+  });
+}
+
+/* 書きだめ帳：タグ絞り込み行（執筆者タグ・視点人物タグをグループごとに表示。グループ内はOR、グループ間はAND） */
+function renderTagFilterChip(row, label, active, onToggle){
+  const b = document.createElement("button");
+  b.className = "tagChip" + (active ? " active" : "");
+  b.textContent = label;
+  b.onclick = () => { onToggle(); renderLibrary(); };
+  row.appendChild(b);
+}
+function renderTagFilterRow(){
+  const row = $("tagFilterRow");
+  const authors = new Set();
+  const viewpoints = new Set();
+  state.novels.forEach(n => {
+    authors.add(n.author || "あなた");
+    (n.viewpoints||[]).forEach(i => viewpoints.add(i));
+  });
+  row.innerHTML = "";
+  if(!authors.size && !viewpoints.size){ row.style.display = "none"; return; }
+  row.style.display = "";
+
+  if(authors.size){
+    const label = document.createElement("span");
+    label.className = "tagGroupLabel";
+    label.textContent = "執筆者";
+    row.appendChild(label);
+    [...authors].forEach(a => {
+      renderTagFilterChip(row, a, activeAuthorFilters.includes(a), () => {
+        const idx = activeAuthorFilters.indexOf(a);
+        if(idx >= 0) activeAuthorFilters.splice(idx,1); else activeAuthorFilters.push(a);
+      });
+    });
+  }
+
+  if(viewpoints.size){
+    const label = document.createElement("span");
+    label.className = "tagGroupLabel";
+    label.textContent = "視点人物";
+    row.appendChild(label);
+    [...viewpoints].sort((a,b)=>a-b).forEach(i => {
+      const v = state.villagers[i];
+      if(!v) return;
+      renderTagFilterChip(row, v.name, activeTagFilters.includes(i), () => {
+        const idx = activeTagFilters.indexOf(i);
+        if(idx >= 0) activeTagFilters.splice(idx,1); else activeTagFilters.push(i);
+      });
+    });
+  }
+
+  if(activeAuthorFilters.length || activeTagFilters.length){
+    const clear = document.createElement("button");
+    clear.className = "tagChip clearChip";
+    clear.textContent = "絞り込み解除";
+    clear.onclick = () => { activeAuthorFilters = []; activeTagFilters = []; renderLibrary(); };
+    row.appendChild(clear);
+  }
+}
+
 function renderLibrary(){
   $("reader").style.display = "none";
+  renderTagFilterRow();
   const list = $("novelList");
   list.style.display = "";
   list.innerHTML = "";
-  if(!state.novels.length){
-    list.innerHTML = `<div class="empty">まだ物語はありません。「物語をかく」から、最初のひとつを。</div>`;
+  const filtering = activeAuthorFilters.length || activeTagFilters.length;
+  const novels = state.novels.filter(n => {
+    if(activeAuthorFilters.length && !activeAuthorFilters.includes(n.author || "あなた")) return false;
+    if(activeTagFilters.length && !(n.viewpoints||[]).some(i => activeTagFilters.includes(i))) return false;
+    return true;
+  });
+  if(!novels.length){
+    list.innerHTML = `<div class="empty">${filtering ? "このタグの物語はまだありません。" : "まだ物語はありません。「物語をかく」から、最初のひとつを。"}</div>`;
     return;
   }
-  [...state.novels].reverse().forEach(n => {
+  [...novels].reverse().forEach(n => {
     const b = document.createElement("button");
     b.className = "novelItem";
-    b.innerHTML = `<div class="t">${esc(n.title || "無題")}</div><div class="meta">${fmtDate(n.createdAt)} ・ ${n.body.length}字${n.updatedAt ? " ・ 編集済み" : ""}</div>`;
+    b.innerHTML = `<div class="t">${esc(n.title || "無題")}</div><div class="meta">${fmtDate(n.createdAt)} ・ ${n.body.length}字${n.updatedAt ? " ・ 編集済み" : ""}</div><div class="tags">${tagsHTML(n)}</div>`;
     b.onclick = () => openReader(n.id);
     list.appendChild(b);
   });
+}
+
+/* 執筆者タグ・視点人物タグをラベル付きで表示する。
+   執筆者はユーザー保存時は常に「あなた」。将来のAI生成時は「わたし（記録係）」を想定（この画面からは変更不可）。 */
+function tagsHTML(n){
+  let html = `<span class="tagGroupLabel">執筆者：</span><span class="tagBadge author">${esc(n.author || "あなた")}</span>`;
+  const vp = (n.viewpoints||[]).map(i => state.villagers[i]).filter(Boolean);
+  if(vp.length){
+    html += `<span class="tagGroupLabel">視点人物：</span>` + vp.map(v => `<span class="tagBadge">${esc(v.name)}</span>`).join("");
+  }
+  return html;
 }
 
 function openReader(id){
   const n = state.novels.find(x => x.id === id);
   if(!n) return;
   currentReaderId = id;
+  $("tagFilterRow").style.display = "none";
   $("novelList").style.display = "none";
   $("reader").style.display = "block";
   $("readerTitle").textContent = n.title || "無題";
   $("readerMeta").textContent = fmtDate(n.createdAt) + " ・ " + n.body.length + "字"
     + (n.updatedAt ? "（" + fmtDate(n.updatedAt) + " 更新）" : "");
+  $("readerTags").innerHTML = tagsHTML(n);
   $("readerBody").textContent = n.body;
 }
 
@@ -1351,7 +1482,7 @@ function switchToView(view){
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x.dataset.view === view));
   ["villageView","writeView","libraryView"].forEach(v => $(v).style.display = v === view ? "" : "none");
   if(view === "libraryView") renderLibrary();
-  if(view === "writeView") renderFaceStrip();
+  if(view === "writeView"){ renderFaceStrip(); renderViewpointStrip(); }
 }
 
 /* 編集中かどうかで「書きとめる」画面の見た目を切り替える */
@@ -1369,7 +1500,7 @@ function setWriteMode(){
 
 document.querySelectorAll("nav button").forEach(b => {
   b.onclick = () => {
-    if(b.dataset.view === "writeView"){ editingId = null; setWriteMode(); } // ナビからは常に新規
+    if(b.dataset.view === "writeView"){ editingId = null; selectedViewpoints = []; setWriteMode(); } // ナビからは常に新規
     switchToView(b.dataset.view);
   };
 });
@@ -1378,27 +1509,34 @@ $("saveNovelBtn").onclick = () => {
   const body = $("novelBody").value.trim();
   if(!body){ toast("まだ何も書かれていません"); return; }
   const title = $("novelTitle").value.trim();
+  const viewpoints = selectedViewpoints.slice();
   if(editingId){
     const n = state.novels.find(x => x.id === editingId);
-    if(n){ n.title = title; n.body = body; n.updatedAt = Date.now(); }
+    if(n){ n.title = title; n.body = body; n.viewpoints = viewpoints; n.updatedAt = Date.now(); }
     save();
     editingId = null;
+    selectedViewpoints = [];
     $("novelTitle").value = ""; $("novelBody").value = "";
     setWriteMode();
+    renderViewpointStrip();
     toast("上書き保存しました");
     switchToView("libraryView");
   }else{
-    state.novels.push({ id:"n"+Date.now(), title, body, createdAt:Date.now() });
+    state.novels.push({ id:"n"+Date.now(), title, body, viewpoints, author:"あなた", createdAt:Date.now() });
     save();
+    selectedViewpoints = [];
     $("novelTitle").value = ""; $("novelBody").value = "";
+    renderViewpointStrip();
     toast("書きとめました");
   }
 };
 
 $("cancelEditBtn").onclick = () => {
   editingId = null;
+  selectedViewpoints = [];
   $("novelTitle").value = ""; $("novelBody").value = "";
   setWriteMode();
+  renderViewpointStrip();
   switchToView("libraryView");
 };
 
@@ -1406,10 +1544,12 @@ $("readerEdit").onclick = () => {
   const n = state.novels.find(x => x.id === currentReaderId);
   if(!n) return;
   editingId = n.id;
+  selectedViewpoints = (n.viewpoints || []).slice();
   $("novelTitle").value = n.title || "";
   $("novelBody").value = n.body;
   switchToView("writeView");
   setWriteMode();
+  renderViewpointStrip();
   $("novelBody").focus();
 };
 
