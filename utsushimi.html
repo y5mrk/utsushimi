@@ -297,6 +297,17 @@
   #faceStrip .pfp{ width:44px; height:auto; }
   .vheader .pfp{ width:120px; height:auto; }
   #arrivalModal .pfp{ width:130px; height:auto; margin:10px auto; }
+  /* 立ち絵の切り替え（カスタム画像 ⇄ 既定のイラスト） */
+  .pfpSwipeWrap{ flex-shrink:0; }
+  .pfpSwipe{ width:120px; overflow:hidden; touch-action:pan-y; cursor:grab; user-select:none; }
+  .pfpSwipe:active{ cursor:grabbing; }
+  .pfpTrack{ display:flex; transition:transform .28s ease; }
+  .pfpPane{ flex:0 0 100%; display:flex; align-items:flex-end; justify-content:center; }
+  .pfpSwipe img, .pfpSwipe svg{ -webkit-user-drag:none; pointer-events:none; }
+  .pfpDots{ display:flex; gap:6px; justify-content:center; margin-top:7px; }
+  .pfpDots span{ width:6px; height:6px; border-radius:50%; background:var(--ink-soft);
+                 opacity:.28; cursor:pointer; transition:opacity .2s; }
+  .pfpDots span.on{ opacity:.72; }
   .pfpCtl{ display:flex; align-items:center; gap:8px 10px; flex-wrap:wrap; margin:2px 0 14px; }
   .pfpNote{ font-size:11.5px; color:var(--ink-soft); line-height:1.5; }
 
@@ -429,9 +440,9 @@
     </div>
     <div class="pfpCtl">
       <input type="file" id="pfpFile" accept="image/png,image/*" style="display:none">
-      <button class="miniBtn" id="pfpUpload">立ち絵を変更</button>
+      <button class="miniBtn" id="pfpUpload">カスタム立ち絵を追加</button>
       <span class="pfpNote">※ 横400px × 縦500pxの背景を透過したPNGを推奨</span>
-      <button class="miniBtn" id="pfpClear" style="display:none">既定のイラストにもどす</button>
+      <button class="miniBtn" id="pfpClear" style="display:none">カスタム立ち絵を削除</button>
     </div>
     <div class="lockNote">この設定は、あたえられたときのまま。あなたにも、この道具にも、書き換えることはできません。（立ち絵の画像だけは、あなたが差し替えたり消したりできます。）</div>
     <div class="sect"><h3>すがた</h3><p id="vmLooks"></p></div>
@@ -981,6 +992,62 @@ function portraitHTML(v){
   return c ? `<img class="pfp" src="${c}" alt="">` : portraitSVG(v);
 }
 
+/* 村人モーダルの立ち絵。カスタム画像があるときだけ、
+   「設定した立ち絵」と「既定のイラスト」を横スワイプで見くらべられる。最初は設定した方。 */
+function renderVmPortrait(v){
+  const host = $("vmPortrait");
+  const c = customPortrait(v);
+  if(!c){ host.className = ""; host.innerHTML = portraitSVG(v); return; }
+  host.className = "pfpSwipeWrap";
+  host.innerHTML =
+    `<div class="pfpSwipe"><div class="pfpTrack">`
+    + `<div class="pfpPane"><img class="pfp" src="${c}" alt=""></div>`
+    + `<div class="pfpPane">${portraitSVG(v)}</div>`
+    + `</div></div>`
+    + `<div class="pfpDots"><span class="on"></span><span></span></div>`;
+  bindPfpSwipe(host);
+}
+
+/* 立ち絵まわりのボタン表示。カスタムの有無で文言ともどすボタンを切り替える。 */
+function setPfpCtl(hasCustom){
+  $("pfpUpload").textContent = hasCustom ? "立ち絵を変更" : "立ち絵を追加";
+  $("pfpClear").style.display = hasCustom ? "" : "none";
+}
+
+function bindPfpSwipe(host){
+  const view = host.querySelector(".pfpSwipe");
+  const track = host.querySelector(".pfpTrack");
+  const dots = Array.from(host.querySelectorAll(".pfpDots span"));
+  let idx = 0, startX = 0, dx = 0, w = 120, dragging = false;
+  const go = (i) => {
+    idx = Math.max(0, Math.min(dots.length - 1, i));
+    track.style.transition = "transform .28s ease";
+    track.style.transform = `translateX(${-idx * 100}%)`;
+    dots.forEach((d, k) => d.classList.toggle("on", k === idx));
+  };
+  view.addEventListener("pointerdown", (e) => {
+    dragging = true; startX = e.clientX; dx = 0;
+    w = view.clientWidth || 120;
+    track.style.transition = "none";
+    try{ view.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  view.addEventListener("pointermove", (e) => {
+    if(!dragging) return;
+    dx = e.clientX - startX;
+    track.style.transform = `translateX(${-idx * w + dx}px)`;
+  });
+  const end = () => {
+    if(!dragging) return;
+    dragging = false;
+    const far = Math.abs(dx) > Math.max(18, w * 0.18);
+    go(far ? (dx < 0 ? idx + 1 : idx - 1) : idx);
+  };
+  view.addEventListener("pointerup", end);
+  view.addEventListener("pointercancel", end);
+  view.addEventListener("pointerleave", end);
+  dots.forEach((d, k) => d.addEventListener("click", () => go(k)));
+}
+
 /* =====================================================
    描画
 ===================================================== */
@@ -1486,8 +1553,8 @@ function openVillager(i){
   const v = state.villagers[i];
   const ap = v.appearance || {};
   curVillager = i;
-  $("vmPortrait").innerHTML = portraitHTML(v);
-  $("pfpClear").style.display = customPortrait(v) ? "" : "none";
+  renderVmPortrait(v);
+  setPfpCtl(!!customPortrait(v));
   $("vmName").textContent = v.name;
   $("vmAge").textContent = v.age + (ap.apparentAge ? `（見た目は ${ap.apparentAge}）` : "");
   $("vmSince").textContent = v.arrivedAt ? fmtDate(v.arrivedAt) + " から村にいる" : "";
@@ -1778,8 +1845,8 @@ $("pfpFile").onchange = (e) => {
         alert("画像が大きすぎて保存できませんでした。もう少し小さい画像でお試しください。");
         return;
       }
-      $("vmPortrait").innerHTML = portraitHTML(v);
-      $("pfpClear").style.display = "";
+      renderVmPortrait(v);
+      setPfpCtl(true);
       renderAll();
       toast("立ち絵を設定しました");
     };
@@ -1793,8 +1860,8 @@ $("pfpClear").onclick = () => {
   const v = state.villagers[curVillager];
   delete state.portraits[pfpKey(v)];
   save();
-  $("vmPortrait").innerHTML = portraitHTML(v);
-  $("pfpClear").style.display = "none";
+  renderVmPortrait(v);
+  setPfpCtl(false);
   renderAll();
   toast("既定のイラストにもどしました");
 };
