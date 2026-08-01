@@ -66,10 +66,13 @@
     border:1px solid var(--line); border-radius:20px; padding:0; min-height:360px;
     box-shadow:0 10px 30px rgba(60,50,35,.12);
   }
-  #villageBg{
+  /* 背景は2枚かさねて、時間帯が変わるときに上の1枚をゆっくり浮かび上がらせる */
+  #villageBg, #villageBgNext{
     position:absolute; inset:0; width:100%; height:100%;
-    object-fit:cover; object-position:center bottom; z-index:0; display:block;
+    object-fit:cover; object-position:center bottom; display:block;
   }
+  #villageBg{ z-index:0; }
+  #villageBgNext{ z-index:1; opacity:0; pointer-events:none; }
   #figureLayer{
     position:relative; z-index:2; min-height:360px; padding:132px 22px 26px;
     display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:center; gap:6px 14px;
@@ -376,6 +379,7 @@
     <div id="countdown"></div>
     <div id="villageField">
       <img id="villageBg" alt="">
+      <img id="villageBgNext" alt="">
       <div id="villageClock">
         <span class="ct">村の時間</span><b id="clockTime">--:--:--</b>
         <span class="season" id="clockSeason"></span>
@@ -1129,20 +1133,59 @@ function shade(hex, amt){ // amt<0 で暗く、>0 で明るく
 let curTheme = null; // "spring|day" のような文字列
 function currentST(){ const d=new Date(); return { s:seasonOf(d.getMonth()+1), t:timeOf(d.getHours()) }; }
 
-function applyTheme(){
-  const {s,t} = currentST();
-  const th = THEME_PALETTES[PALETTE_MAP[s+"|"+t] || "beige"];
+/* 時間帯が移るとき、配色と風景はこれだけの時間をかけて少しずつ入れかわる */
+const FADE_MS = 10 * 60 * 1000;
+const CSS_VAR = {
+  paper:"--paper", paper2:"--paper2", card:"--card", line:"--line",
+  accent:"--accent", accentDark:"--accent-dark", ink:"--ink", inkSoft:"--ink-soft"
+};
+let curPalette = null, themeFade = null;
+
+function lum(hex){ // ざっくりした明るさ（0=暗い 1=明るい）
+  const n = parseInt(hex.slice(1),16);
+  return (((n>>16)&255)*.299 + ((n>>8)&255)*.587 + (n&255)*.114) / 255;
+}
+
+function setPalette(p){
   const r = document.documentElement.style;
+  for(const k in CSS_VAR) r.setProperty(CSS_VAR[k], p[k]);
+  curPalette = p;
+}
+
+/* fade=true のときは FADE_MS かけて今の色から新しい色へにじませる */
+function applyTheme(fade){
+  const {s,t} = currentST();
+  const to = THEME_PALETTES[PALETTE_MAP[s+"|"+t] || "beige"];
   const dark = (PALETTE_MAP[s+"|"+t] === "navy");
-  document.documentElement.classList.toggle("dark", dark);
-  r.setProperty("--paper", th.paper);
-  r.setProperty("--paper2", th.paper2);
-  r.setProperty("--card", th.card);
-  r.setProperty("--line", th.line);
-  r.setProperty("--accent", th.accent);
-  r.setProperty("--accent-dark", th.accentDark);
-  r.setProperty("--ink", th.ink);
-  r.setProperty("--ink-soft", th.inkSoft);
+  if(themeFade){ clearInterval(themeFade); themeFade = null; }
+  if(!fade || !curPalette){
+    document.documentElement.classList.toggle("dark", dark);
+    setPalette(to);
+    return;
+  }
+  const from = curPalette, t0 = Date.now();
+  /* 明るい配色と暗い配色が入れかわる遷移（夕→夜など）では、中ほどで紙も文字も
+     おなじ灰色に寄って読めなくなる。そこだけ中央を足早に渡るカーブにして、
+     文字がうすくなる時間を十数秒に縮める。日の落ちかたとしても、こちらのほうが自然。 */
+  const flip = (lum(from.paper) > .5) !== (lum(to.paper) > .5);
+  const ease = flip
+    ? (p => { const x = 2*p - 1; return .5 + .5*Math.sign(x)*Math.pow(Math.abs(x), 1/5); })
+    : (p => p * p * (3 - 2*p));   // 端をなめらかに
+  let flipped = false;
+  themeFade = setInterval(() => {
+    const p = Math.min(1, (Date.now() - t0) / FADE_MS);
+    const e = ease(p);
+    if(p >= 1){
+      clearInterval(themeFade); themeFade = null;
+      if(!flipped) document.documentElement.classList.toggle("dark", dark);
+      setPalette(to);
+      return;
+    }
+    const cur = {};
+    for(const k in CSS_VAR) cur[k] = mix(from[k], to[k], e);
+    setPalette(cur);
+    if(!flipped && e >= .5){ flipped = true; document.documentElement.classList.toggle("dark", dark); }
+  }, 2000);
 }
 
 /* ---- 風景SVG：湖畔の村（霞のかかった、やわらかな絵柄）---- */
@@ -1300,12 +1343,46 @@ function sceneSVG(){
   return g;
 }
 
-function renderScene(){
-  const {s,t} = currentST();
-  const bg = $("villageBg");
-  if(!bg) return;
+function sceneSrc(s,t){
   const img = (window.SCENE_IMG||{})[s+"|"+t];
-  bg.src = img ? img : ("data:image/svg+xml," + encodeURIComponent(sceneSVG()));
+  return img ? img : ("data:image/svg+xml," + encodeURIComponent(sceneSVG()));
+}
+
+let curScene = null, sceneFade = null;
+
+/* fade=true のときは、新しい風景を上にかさねて FADE_MS かけて浮かび上がらせる */
+function renderScene(fade){
+  const {s,t} = currentST();
+  const bg = $("villageBg"), nx = $("villageBgNext");
+  if(!bg) return;
+  const key = s + "|" + t;
+  if(key === curScene) return;          // 同じ景色なら何もしない（村の再描画で呼ばれても壊さない）
+  if(sceneFade){ clearTimeout(sceneFade); sceneFade = null; }
+  const src = sceneSrc(s,t);
+  curScene = key;
+  if(!fade || !nx){
+    if(nx){ nx.style.transition = "none"; nx.style.opacity = "0"; }
+    bg.src = src;
+    return;
+  }
+  nx.style.transition = "none";
+  nx.style.opacity = "0";
+  nx.onload = () => {
+    nx.onload = null;
+    requestAnimationFrame(() => {
+      nx.style.transition = `opacity ${FADE_MS}ms linear`;
+      nx.style.opacity = "1";
+    });
+    sceneFade = setTimeout(() => {      // 渡りきったら下の1枚に置きかえて、上を空にする
+      sceneFade = null;
+      bg.src = nx.src;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        nx.style.transition = "none";
+        nx.style.opacity = "0";
+      }));
+    }, FADE_MS + 400);
+  };
+  nx.src = src;
 }
 
 function tickClock(){
@@ -1317,10 +1394,11 @@ function tickClock(){
   const cs = $("clockSeason");
   if(cs) cs.textContent = `${SEASON_JP[s]}・${TIME_JP[t]}`;
   const key = s + "|" + t;
-  if(key !== curTheme){ // 季節・時間帯が変わったら配色と風景を更新
+  if(key !== curTheme){ // 季節・時間帯が変わったら、10分かけてゆっくり配色と風景を移す
+    const first = (curTheme === null);
     curTheme = key;
-    applyTheme();
-    renderScene();
+    applyTheme(!first);
+    renderScene(!first);
   }
 }
 
