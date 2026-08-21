@@ -220,6 +220,11 @@
   .ghostBtn:hover{background:var(--card);}
   .miniBtn{background:var(--card); border:1px solid var(--line); border-radius:6px; padding:3px 14px; font-size:12px; color:var(--ink);}
   .dangerBtn{background:none; border:1px solid #c8a08a; color:var(--warn); border-radius:8px; padding:6px 16px; font-size:12px;}
+  /* 設定モーダルの各まとまり */
+  .setSect + .setSect{ border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
+  .setH3{ font-size:13px; letter-spacing:.14em; color:var(--ink); margin-bottom:8px; }
+  .setNote{ font-size:12px; color:var(--ink-soft); line-height:1.7; margin-bottom:10px; }
+  .setBtns{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
 
   /* ============================================================
      洗練トーンの仕上げ（季節テーマの移り変わりつき）
@@ -488,8 +493,22 @@
   <div class="modal">
     <button class="close" data-close="settingsModal">×</button>
     <h2 style="font-size:18px; letter-spacing:.2em; margin-bottom:18px;">設定</h2>
-    <p style="font-size:12px; color:var(--ink-soft); margin-bottom:10px;">検証用：村と物語をすべて消して最初からやり直します。村人の設定の「変更」はできませんが、村ごと手放すことだけはできます。</p>
-    <button class="dangerBtn" id="resetBtn">村を畳む（全データ削除）</button>
+
+    <div class="setSect">
+      <h3 class="setH3">データの持ち出しと読み込み</h3>
+      <p class="setNote">村・物語・立ち絵をふくむすべてのデータを、ひとつのファイルに書き出せます。別のブラウザや端末で読み込めば、同じ村をそのまま続けられます。</p>
+      <div class="setBtns">
+        <button class="miniBtn" id="exportBtn">データを書き出す</button>
+        <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+        <button class="miniBtn" id="importBtn">データを読み込む</button>
+      </div>
+      <p class="setNote">※ 読み込むと、いまブラウザにある村と物語は上書きされます。心配なときは、先に書き出しておいてください。</p>
+    </div>
+
+    <div class="setSect">
+      <p style="font-size:12px; color:var(--ink-soft); margin-bottom:10px;">検証用：村と物語をすべて消して最初からやり直します。村人の設定の「変更」はできませんが、村ごと手放すことだけはできます。</p>
+      <button class="dangerBtn" id="resetBtn">村を畳む（全データ削除）</button>
+    </div>
   </div>
 </div>
 
@@ -552,7 +571,7 @@ const HAIR_HUE = [["黒",8],["こげ茶",8],["明るい茶",5],["亜麻色",3],[
 const EYE_HUE = [["黒",8],["こげ茶",8],["榛色",4],["灰",3],["青",3],["緑",3],["金",1.5],["すみれ色",1],["赤",1],["左右で色がちがう",1],["白銀",0.5]];
 const SKIN_HUE = [["ふつうの肌色",10],["色白",6],["日に焼けた色",6],["褐色",4],["青白い",2],["灰がかった色",1],["ほんのり緑がかった色",1],["陶器のように白い",1]];
 const SPECIAL_AGE = ["年齢不詳","数えるのをやめたらしい","生まれた年の記録が二つある","本人いわく『わかいほう』"];
-const SEED_WORDS = ["井戸","嘘","発酵","灯台","蜂","留守番","地図","塩","手紙","梯子","雨戸","汽笛","こだま","入れ歯","北風","川底","かなづち","へそくり","渡り鳥","昼寝","足あと","そろばん","真夜中","豆","古井戸","口笛","繕いもの","石垣","蜃気楼","粉","編み目","おつかい","忘れもの","満月","畑","靴ひも","湯気","くしゃみ","峠","貝殻","たき火","地下室","羅針盤","仕立て","蚕","うわさ","結び目","日時計","水たまり","屋根裏","鍵","行商","早起き","茸","写し絵","こおろぎ","粘土","橋","返事","前掛け","石臼","雪解け","名づけ","逆立ち","干し草","呼び鈴","遠眼鏡","綴じ糸","南京錠","浮き輪","休符","接ぎ木","算術","果樹","文鎮","初雪","たんこぶ","帳面","風見鶏","納屋","糸車","返却","朗読","隠し味","夜番","伝言","背くらべ","空き瓶","うたた寝"];
+const SEED_WORDS = ["井戸","嘘","灯台","蜂","留守番","地図","塩","手紙","梯子","雨戸","汽笛","こだま","入れ歯","北風","川底","かなづち","へそくり","渡り鳥","昼寝","足あと","そろばん","真夜中","豆","古井戸","口笛","繕いもの","石垣","蜃気楼","粉","編み目","おつかい","忘れもの","満月","畑","靴ひも","湯気","くしゃみ","峠","貝殻","たき火","地下室","羅針盤","仕立て","蚕","うわさ","結び目","日時計","水たまり","屋根裏","鍵","行商","早起き","茸","写し絵","こおろぎ","粘土","橋","返事","前掛け","石臼","雪解け","名づけ","逆立ち","干し草","呼び鈴","遠眼鏡","綴じ糸","南京錠","浮き輪","休符","接ぎ木","算術","果樹","文鎮","初雪","たんこぶ","帳面","風見鶏","納屋","糸車","返却","朗読","隠し味","夜番","伝言","背くらべ","空き瓶","うたた寝"];
 
 function makeConstraints(){
   let age;
@@ -1974,6 +1993,57 @@ $("resetBtn").onclick = () => {
   if(!confirm("本当に村を畳みますか？ この操作は取り消せません。")) return;
   localStorage.removeItem(LS_KEY);
   location.reload();
+};
+
+/* ---- データの書き出し（export）---- */
+$("exportBtn").onclick = () => {
+  if(!state){ toast("まだ書き出すデータがありません"); return; }
+  const payload = { app:"utsushimi", key:LS_KEY, version:1, exportedAt:Date.now(), state };
+  let url;
+  try{
+    const blob = new Blob([JSON.stringify(payload)], { type:"application/json" });
+    url = URL.createObjectURL(blob);
+  }catch(err){ toast("書き出しに失敗しました"); return; }
+  const d = new Date(), p = n => String(n).padStart(2,"0");
+  const stamp = `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+  const safe = (state.villageName || "うつしみ").replace(/[\\/:*?"<>|\s]+/g, "_");
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `utsushimi_${safe}_${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast("データを書き出しました");
+};
+
+/* ---- データの読み込み（import）---- */
+/* 書き出しファイル（envelope付き）でも、state 単体のJSONでも受けつける */
+function extractState(obj){
+  if(!obj || typeof obj !== "object") return null;
+  const st = (obj.state && typeof obj.state === "object") ? obj.state : obj;
+  return (st && Array.isArray(st.villagers)) ? st : null;
+}
+$("importBtn").onclick = () => $("importFile").click();
+$("importFile").onchange = (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";   // 同じファイルを選び直せるようにする
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try{ data = JSON.parse(reader.result); }
+    catch(err){ alert("ファイルを読み込めませんでした（正しい形式ではありません）。"); return; }
+    const st = extractState(data);
+    if(!st){ alert("このファイルには、うつしみの村のデータが見あたりませんでした。"); return; }
+    const nm = st.villageName || "名もなき村", n = st.villagers.length;
+    if(!confirm(`「${nm}」（村人 ${n}人）を読み込みます。\nいまブラウザにある村と物語は上書きされます。よろしいですか？`)) return;
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(st)); }
+    catch(err){ alert("データが大きすぎて保存できませんでした。立ち絵の少ないデータでお試しください。"); return; }
+    location.reload();
+  };
+  reader.onerror = () => alert("ファイルを読み込めませんでした。");
+  reader.readAsText(file);
 };
 
 /* =====================================================
