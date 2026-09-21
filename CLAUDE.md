@@ -51,7 +51,7 @@ AIがランダムに架空の村人を生成し、ユーザーがその村人た
 - `state = { mode, apiKey, villageName, villageDescription, villagers[], novels[], portraits{}, createdAt, lastVillagerAt }`
   - `villagers[]`: 生成された村人（`appearance` などを含む。`arrivedAt` で識別）。
   - `novels[]`: `{ id, title, body, createdAt, updatedAt? }`
-  - `bonds[]`: `{ a, b, kind, text }`（a/b は `name|arrivedAt`）。村人どうしの縁。**村人の設定ではなく村のものとして持つ**ので、相手の確定ずみの文章に手を入れずに両方のページから同じ縁が見える。追記だけで、消さない。
+  - `bonds[]`: `{ a, b, kind, text }`（a/b は `name|arrivedAt`）。村人どうしの縁。**村人の設定ではなく村のものとして持つ**ので、相手の確定ずみの文章に手を入れずに両方のページから同じ縁が見える。追記だけで、消さない。掲示板のプロンプトにも `bondSummary()` で一覧を渡す。
   - `portraits{}`: `"name|arrivedAt" → PNG dataURI`（ユーザーがアップした立ち絵）。
 - `save()` / `load()` で読み書き。`load()` は旧データも `mode="api"`・`portraits={}` に補正する。
 

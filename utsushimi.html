@@ -810,9 +810,9 @@ const BOND_KINDS = [
   ["きょうだい", 1.2, [1, 15], null],
   ["ふたご", 1.5, [0, 0], null],
   ["親と子", 1.0, [18, 50], null],
-  ["いとこ、親戚、または遠い縁つづき", 1.5, [0, 40], null],
+  ["いとこ、親戚、または遠い縁つづき", 1.5, null, null],
   ["血はつながらないが、育てた、または育てられた", 0.8, [16, null], null],
-  ["連れ合いをとおしての身内", 0.8, [0, 30], 18],
+  ["連れ合いをとおしての身内", 0.8, null, 18],
   /* 暮らしの近さ */
   ["近所に住んでいる", 2.5, null, null],
   ["毎朝おなじ時分に顔を合わせる", 2.0, null, null],
@@ -828,7 +828,7 @@ const BOND_KINDS = [
   ["同じものを好む相手", 2.0, null, null],
   /* 仕事と教え */
   ["同僚、または仕事で関わりのある相手", 2.5, null, 12],
-  ["師と弟子", 1.2, [12, 60], 8],
+  ["師と弟子", 1.2, [12, null], 8],
   ["おなじ人に教わった相手", 1.2, null, 12],
   ["ものを売り買いする間柄", 1.8, null, 10],
   /* 貸し借りと負い目 */
@@ -1027,6 +1027,21 @@ function villagerSummary(){
     `- ${v.name}（${v.age}）: ${String(v.personality||"").slice(0,90)}／関係: ${String(v.relationships||"").slice(0,90)}`
   ).join("\n");
 }
+/* 村に結ばれている縁の一覧。だれとだれが、どういう縁か。
+   縁の文章（text）までは渡さない。渡すと、掲示板がその話を言いかえて
+   「きょうの出来事」として貼り出してしまうため、種類だけにしておく。
+   縁がひとつも無ければ空文字（＝そのまま section ごと省く） */
+function bondSummary(){
+  const nameOf = id => {
+    const v = (state.villagers || []).find(x => pfpKey(x) === id);
+    return v ? v.name : null;
+  };
+  const lines = (state.bonds || []).map(b => {
+    const a = nameOf(b.a), c = nameOf(b.b);
+    return (a && c) ? `- ${a} と ${c}：${b.kind || "縁がある"}` : null;
+  }).filter(Boolean);
+  return lines.join("\n");
+}
 function novelContext(){
   if(!state.novels.length) return "（まだ物語は書かれていません）";
   const parts = [];
@@ -1143,11 +1158,16 @@ function buildBulletinPrompt(targetDateJP, prevBoard){
   const prevNote = (prevBoard && prevBoard.events.length)
     ? `\n# 前回の掲示板（参考。同じ出来事を繰り返さないこと）\n${prevBoard.events.map(e => `- ${e.time ? e.time+" " : ""}${e.text}`).join("\n")}\n`
     : "";
+  const bonds = bondSummary();
+  const bondNote = bonds ? `\n# 村人どうしの縁\n${bonds}\n` : "";
+  const bondRule = bonds
+    ? "\n- 村人どうしの縁（上の一覧）をふまえた出来事を、すくなくとも1件は入れること。縁の中身をそのまま告知にせず、その縁があるからこそ起きる、その日かぎりの出来事にすること。"
+    : "";
   return `「${state.villageName}」（${state.villageDescription||""}）という村で、${targetDateJP}に起きた、村の掲示板に貼り出すようなちょっとした事件やできごとを2〜4件考えてください。
 
 # いまの村人たち
 ${villagerSummary()}
-
+${bondNote}
 # これまでにユーザーが書いた物語
 ${novelContext()}
 ${prevNote}
@@ -1155,7 +1175,7 @@ ${prevNote}
 - 村人の設定やこれまでの物語と大きく矛盾しないこと（死んだはずの人物が元気に動き回る、確定した事実と衝突する、など）。
 - ただし、物語の続きやオチをつけるような出来事を作ってはならない。物語はあくまで「矛盾を避けるための確認」に使うこと。
 - 村人が関わらない、天気や動物、道具など村の空気を感じさせる些細な出来事も歓迎する。
-- 一人の村人に偏らず、複数の村人が織り交ざるようにすること。
+- 一人の村人に偏らず、複数の村人が織り交ざるようにすること。${bondRule}
 - 内容（text）は掲示板の一文告知のように短く具体的に（1〜2文）。
 - 時刻（time）は "HH:MM" の24時間表記。4件なら4件とも別々の時間帯に散らすこと。
 - 出力は有効なJSONのみ。コードブロックや説明文をつけないこと。
