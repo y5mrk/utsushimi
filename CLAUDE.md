@@ -56,7 +56,7 @@ AIがランダムに架空の村人を生成し、ユーザーがその村人た
 ### 生成（AI呼び出し）
 
 - `callClaude(prompt, maxTokens)` が `PROXY_URL`（Cloudflare Worker中継）へPOST。**APIキーはこのファイルに書かず、プロキシ側のSecretに保管**。`SYSTEM_PROMPT` は user 発言の先頭に折り込む。
-- `makeConstraints()` がクライアント側で乱数制約（髪の長さ/結い方/色/年齢/発想の種）を作り、プロンプトに埋め込む。AIはこの制約に従う。
+- `makeConstraints()` がクライアント側で乱数制約（髪の長さ/結い方/髪質/色/年齢/発想の種）を作り、プロンプトに埋め込む。AIはこの制約に従う。
 - `buildInitialPrompt()`（村＋最初の3人）／`buildNewVillagerPrompt()`（増員）。出力は有効なJSONのみ。
 - 生成ルール要点: 名前は人種を固定しない（日本語風でない名はカタカナ）。年齢は人外もOK（その場合 `apparentAge` に「人間でいうと何歳か」を書く）。`hairStyle` を立ち絵に反映。既存物語との「大きな矛盾」だけ避ける。
 
@@ -77,7 +77,7 @@ AIがランダムに架空の村人を生成し、ユーザーがその村人た
 ## 機能ごとのポイント
 
 - **村人増員**: `WEEK = 7日`ごとに1人、`MAX_AUTO_POP = 25` まで自動。到達後は「新しい村人を招く」ボタン。
-- **立ち絵の絵柄**: 細い茶色の輪郭・丸い顔・ハイライトや頬紅なし・目は小さめ・口もとは無表情/ひかえめな笑み/口をあけた笑顔を人物ごとに出し分け。髪型 enum は `down|ponytailLow|ponytailHigh|bun|braid|twin`、長さ enum は `bald|veryShort|short|medium|long|veryLong`。`otherFeatures`/`personality` のテキストから髭・眼鏡・そばかす・スカーフを検出して描画。
+- **立ち絵の絵柄**: 細い茶色の輪郭・丸い顔・ハイライトや頬紅なし・目は小さめ・口もとは無表情/ひかえめな笑み/口をあけた笑顔を人物ごとに出し分け。髪型 enum は `down|ponytailLow|ponytailHigh|bun|braid|twin`、長さ enum は `bald|veryShort|short|medium|long|veryLong`。前髪は `FRINGES`（ぱっつん/センターパート/七三/ワンレン/ラウンド/シースルー/ふんわり）から、名前と年齢で決まる型をひく。眉は前髪より先に描いて、かぶったぶんを隠す（頭巾のときだけ眉が上）。`otherFeatures`/`personality` のテキストから髭・眼鏡・そばかす・スカーフを検出して描画。
 - **立ち絵の差し替え**: 村人詳細モーダルの「立ち絵を変更」。透過PNG（横400×縦500目安、4:5）を推奨。アップ画像は canvas で最大440×560に縮小しPNG dataURIで `state.portraits` に保存。「既定のイラストにもどす」で削除→SVGに戻る。保存失敗（容量超過）時はロールバックして警告。
 - **背景（16枚）**: `SCENE_IMG` の dataURI。`<img id="villageBg">` + `object-fit:cover` で全面表示（比率ズレで端に隙間が出ない）。差し替えは `背景プロンプト16枚.md` で画像を作り直し、再エンコードして `SCENE_IMG` を更新。
 - **UIテーマ（6案）**: `THEME_PALETTES`（`beige`=01 / `sepia`=02 / `bluegrey`=04 / `pastel`=05 / `navy`=06）、`PALETTE_MAP` で `季節|時間 → パレット` を割り当て（夕=セピア, 夜=ネイビー 等）。`applyTheme` がCSS変数をセットし、`navy` のとき `<html class="dark">`。
@@ -104,3 +104,4 @@ AIがランダムに架空の村人を生成し、ユーザーがその村人た
 - **暗テーマの可読性**: `navy` 時に白背景＋濃文字が反転して読めなくなる箇所に注意。テーマ変数（`--card`/`--ink` 等）で組む。
 - **`SCENE_IMG` の読み込み順**: 本体スクリプトより前に定義されていること。
 - **プロキシ依存**: 生成は `PROXY_URL` 前提。落ちると生成できない（エラーバナー＋再試行あり）。
+- **`portraitSVG` の `rnd()` の呼び出し順**: 服の色・かたむき・眉2つ・口もと・前髪の順で、名前と年齢から再現している（保存はしていない）。手前に呼び出しを足したり順番を変えたりすると、**すでにいる村人の顔つきまで変わる**。増やすときは末尾に足す。`CLOTH_PALETTE` や `FRINGES` の要素数を変えたときも同じ。

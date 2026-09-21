@@ -680,6 +680,16 @@ function wpick(pairs){
 const HAIR_LEN = [["bald",1],["veryShort",3],["short",5],["medium",5],["long",4],["veryLong",2]];
 const HAIR_LEN_JP = {bald:"髪はほとんどない", veryShort:"とても短い", short:"短い", medium:"肩につかない程度", long:"肩を越える長さ", veryLong:"腰にとどくほど長い"};
 const HAIR_STYLE_JP = {down:"おろしている", ponytailLow:"低い位置でひとつに結んでいる", ponytailHigh:"高い位置でポニーテールに結んでいる", bun:"頭の上でお団子にまとめている", braid:"背中で三つ編みにしている", twin:"左右で二つに結んでいる"};
+/* 髪質：くせの出かた・毛の太さ・量。3番目の要素が 1 のものはファンタジー時のみ */
+const HAIR_TEXTURE = [
+  ["直毛", 5], ["かための直毛", 2.5], ["細くやわらかい猫っ毛", 3],
+  ["ゆるく波打つ癖毛", 3.5], ["うねりの強い癖毛", 2.5], ["くるくるの巻き毛", 2], ["こまかくちぢれた毛", 1.5],
+  ["ごわごわとかたい毛", 2], ["量が多くふくらみやすい", 2.5], ["量がすくなく、ぺたんとしている", 2],
+  ["しっとりと艶がある", 2.5], ["パサついて広がりやすい", 2], ["寝ぐせがつきやすい", 2],
+  ["毛先だけ日に焼けている", 1.5], ["しゃりっと乾いた手ざわり", 1.2], ["生えぎわのつむじに癖がある", 1.2],
+  ["ほのかに光をふくむ", 0.8, 1], ["けもののようにかたい毛", 0.8, 1],
+  ["水のようにさらさらと落ちる", 0.8, 1]
+];
 /* 3番目の要素が 1 のものは「ファンタジーがオン」ときだけ選ばれる */
 const HAIR_HUE = [["黒", 4.5], ["濡れ羽色", 2], ["こげ茶", 4.5], ["明るい茶", 4.5], ["栗色", 3.5], ["赤茶", 2.5], ["亜麻色", 3], ["砂色", 2], ["金", 2], ["蜂蜜色", 2], ["くすんだ金", 1.5], ["プラチナブロンド", 1.2], ["銀", 2], ["白", 2], ["白髪まじり", 2], ["灰", 2], ["青みがかった灰", 1.2], ["赤毛", 2], ["赤銅色", 1.2], ["黒に近い焦げ茶", 2], ["深い緑", 1, 1], ["若草色", 0.8, 1], ["苔のような色", 1, 1], ["青", 1, 1], ["水色", 0.8, 1], ["藍", 0.8, 1], ["海のような色", 1, 1], ["すみれ色", 1, 1], ["薄紫", 0.8, 1], ["灰紫", 0.8, 1], ["桃色", 1, 1], ["珊瑚色", 0.8, 1], ["葡萄色", 0.8, 1], ["血のような赤", 0.7, 1], ["夕焼けのような橙", 0.8, 1], ["雪のような白銀", 0.8, 1], ["光の加減で虹がさす黒", 0.5, 1]];
 const EYE_HUE = [["黒", 7], ["こげ茶", 7], ["明るい茶", 2.5], ["榛色", 4], ["琥珀", 2.5], ["金", 1.5], ["灰", 3], ["青みの強い灰", 1.2], ["青", 3], ["濃い藍", 1.5], ["緑", 3], ["灰緑", 1.5], ["茶に金の斑が散る", 1], ["左右で色がちがう", 1], ["すみれ色", 1, 1], ["深い紫紺", 0.8, 1], ["赤", 1, 1], ["桜色", 0.8, 1], ["白銀", 0.5, 1], ["金と銀がまじる", 0.6, 1], ["苔色", 0.8, 1], ["夕焼けのような橙", 0.8, 1], ["瞳孔が縦に長い金", 0.6, 1], ["透きとおって色がない", 0.5, 1], ["見る角度で七色にゆらぐ", 0.4, 1]];
@@ -768,6 +778,7 @@ function makeConstraints(){
   const humanLike = typeof age === "string" && /^\d+歳$/.test(age) && parseInt(age) <= 119;
   return {
     hairLength, hairStyle,
+    hairTexture: huePick(HAIR_TEXTURE),
     hairHue: huePick(HAIR_HUE),
     eyeHue: huePick(EYE_HUE),
     skinHue: huePick(SKIN_HUE),
@@ -781,6 +792,7 @@ function constraintText(c){
   const ageNote = c.humanLike ? "" : "（人間の一般的な年齢ではない）";
   return `- 髪の長さ: ${HAIR_LEN_JP[c.hairLength]}（hairLength は "${c.hairLength}"）
 - 髪型: ${HAIR_STYLE_JP[c.hairStyle]}（hairStyle は "${c.hairStyle}"。この値をそのまま返し、外見の描写にも反映すること）
+- 髪質: ${c.hairTexture}（hairTexture はこの言葉をそのまま返し、外見の描写にも反映すること）
 - 髪色の系統: ${c.hairHue}
 - 瞳の色の系統: ${c.eyeHue}
 - 肌の色の系統: ${c.skinHue}
@@ -805,6 +817,7 @@ const VILLAGER_SCHEMA = `{
         "skinColorName": "肌の色の呼び名", "skinColorHex": "#rrggbb",
         "hairLength": "bald|veryShort|short|medium|long|veryLong",
         "hairStyle": "down|ponytailLow|ponytailHigh|bun|braid|twin（乱数制約の値をそのまま返す）",
+        "hairTexture": "髪質（乱数制約の言葉をそのまま返す）",
         "apparentAge": "見た目の年齢。『二十代半ばに見える』のように人間としてありうる年齢の言い方で必ず書く。『人間でいうと』などの前置きはつけない",
         "otherFeatures": "そのほか外見の特徴を1〜2文で"
       },
@@ -831,7 +844,7 @@ ${worldRule}
 - 名前は特定の人種・国籍に偏らせないこと。日本語風の名前ばかりにせず、さまざまな文化圏の名前をランダムに選ぶこと。名前を理由に人種を固定しないこと。日本語風でない名前のときは、その名前をカタカナで表記すること（例：「エルナ」「タヴィ」「ヨナス」）。
 ${ageRule}
 - apparentAge は「二十代半ばに見える」「六十を過ぎたくらいに見える」のように、人間としてありうる年齢の言い方だけで書くこと。「人間でいうと」「人間にたとえると」といった前置きや、人外であることをほのめかす言い回しは書かないこと。
-- hairStyle は乱数制約で与えられた値をそのまま返し、外見の描写（otherFeatures など）にも矛盾しないように反映すること。
+- hairStyle は乱数制約で与えられた値をそのまま返し、外見の描写（otherFeatures など）にも矛盾しないように反映すること。\n- hairTexture も乱数制約の言葉をそのまま返すこと。髪のくせ・手ざわり・毛量として、otherFeatures や暮らしのふるまい（朝の手入れ、結うときの苦労など）に自然ににじませてよい。
 - personality は、はじめの1〜2文で乱数制約の「ひととなり」がはっきり伝わるように書き、そのあとに具体的なエピソードを続けること。性格をぼかしたり、含みをもたせて伏せたりしないこと。乱数制約の「人づきあい」とも矛盾させないこと（たとえば「人見知りで、口数がすくない」人を、だれとでもすぐ打ちとける人物として描かないこと）。
 - sociability には乱数制約の「人づきあい」を書くこと。だれとどう話すか、村の集まりでどうふるまうか、はじめて会う相手にどう出るかなど、人との距離のとり方が目に浮かぶように、具体的な場面をまじえて書くこと。personality と同じ内容をくりかえさないこと。
 - ひととなりが明るい人・外向的な人は、そのまま明るく外向的に描くこと。だれもかれもを物静かで内省的な人物にしないこと。意地悪・偏屈・高慢といった難のある性格も、そのとおりに描いてよい（読み手に嫌われないよう和らげなくてよい）。
@@ -1087,7 +1100,18 @@ function safeHex(h, fb){
   }
   return fb;
 }
-const CLOTH_PALETTE = ["#7d8a5f","#9c6f66","#4f6272","#6f8377","#b89a52","#8a6a4f","#c2a15f","#7a6f86","#9aa08a","#6f7d5a","#a5866a"];
+/* 服の色。彩度はおさえたまま、色みが緑や茶にかたよらないよう
+   青・青緑・黄・橙・赤・桃・紫・無彩色までひととおり並べる。 */
+const CLOTH_PALETTE = [
+  "#3f5570","#4f6272","#6b88a6",           // 青
+  "#4e8079","#7fa8a0",                     // 青緑
+  "#6f7d5a","#7d8a5f",                     // 緑
+  "#b89a52","#d0b978",                     // 黄
+  "#8a6a4f","#b8734f",                     // 茶・樺
+  "#9c5049","#8b4a55","#c28f8c",           // 赤・桃
+  "#6a5578","#7a6f86","#9a8fb0",           // 紫
+  "#4a4a52","#8d9298","#d6cbb4"            // 墨・鼠・生成り
+];
 
 function portraitSVG(v){
   const ap = v.appearance || {};
@@ -1126,8 +1150,27 @@ function portraitSVG(v){
     long:    "M29,52 C 22,84 26,110 32,124 Q40,118 46,124 Q53,118 60,124 Q67,118 74,124 Q80,118 88,124 C 94,110 98,84 91,52 C 88,37 78,27 60,26 C 42,27 32,37 29,52 Z",
     veryLong:"M29,52 C 19,92 24,126 30,150 Q40,144 47,150 Q53,144 60,150 Q67,144 73,150 Q80,144 90,150 C 96,126 101,92 91,52 C 88,37 78,27 60,26 C 42,27 32,37 29,52 Z"
   };
-  const cap =
-    `<path d="M30,54 C 29,32 43,23 60,23 C 77,23 91,32 90,54 C 86,50 81,47 77,51 Q71,44 65,50 Q60,43 55,50 Q49,44 43,51 C 39,47 34,50 30,54 Z" fill="${hair}" ${S}/>`;
+  /* 前髪。頭の丸み（capOuter）は共通で、そこから左へ戻る下ぎわの線だけを型ごとに変える。
+     どの型になるかは、表情と同じく名前と年齢から決まる（→ FRINGE_KEYS のひき当て）。 */
+  const capOuter = "M30,54 C 29,32 43,23 60,23 C 77,23 91,32 90,54 ";
+  const FRINGES = {
+    blunt:  "C 89.5,57 89,60 87.5,61 C 85.5,56 82.5,50 80,44 C 79.3,45.8 78.6,47.7 78,49.5 L 42,49.5 C 41.4,47.7 40.7,45.8 40,44 C 37.5,50 34.5,56 32.5,61 C 31,60 30.5,57 30,54 Z", // ぱっつん（横に毛束をたらす）
+    center: "C 87,52 83,51 78,52 C 71,49 65,43 60,40 C 55,43 49,49 42,52 C 37,51 33,52 30,54 Z",    // センターパート
+    side:   "C 87,50 83,46 79,43 C 76,40 73,38 71,41 C 66,47 58,51 48,52 C 41,53 35,52 30,54 Z",    // 七三でながす
+    oneLen: "C 89.5,60 88.5,66 86.5,71 C 80,60 70,46 58,39.5 C 50,43.5 40,51 34.5,66 C 33,62 31,58 30,54 Z", // ワンレン（前髪をつくらず、分け目から顔の横へながす）
+    round:  "C 89,56 88,57 87,57.5 C 85,55 83,52 82,50 C 79,49.4 76,49 74,49 C 70,44 65,42.5 61,43 C 55,43.5 48,46 42.5,50.5 C 40,51 36,51 34,51 C 33.5,53 33,56 32.8,58 C 31.5,57 30.5,56 30,54 Z", // ラウンド
+    sheer:  "C 86,52 84,49 81,46 C 73,41 47,41 39,46 C 36,49 34,51 30,54 Z",                        // シースルー
+    wave:   "C 86,50 81,47 77,51 Q71,44 65,50 Q60,43 55,50 Q49,44 43,51 C 39,47 34,50 30,54 Z"      // ふんわり
+  };
+  const FRINGE_KEYS = Object.keys(FRINGES);
+  /* シースルーだけは、生えぎわを高くしたうえに、すける前髪をうすく重ねる */
+  const sheerVeil =
+    `<path d="M37,45 C 45,41 75,41 83,45 C 82,51 76,54.5 60,54.5 C 44,54.5 38,51 37,45 Z" fill="${hair}" opacity=".42"/>` +
+    [[48, 53], [60, 54.5], [72, 53]].map(([x, y2], i) =>
+      `<path d="M${x},43 Q${x + (i % 2 ? 1.4 : -1.4)},${((43 + y2) / 2).toFixed(1)} ${x},${y2}" fill="none" stroke="${hair}" stroke-width="1.6" stroke-linecap="round" opacity=".75"/>`
+    ).join("");
+  const capFor = k =>
+    `<path d="${capOuter}${FRINGES[k]}" fill="${hair}" ${S}/>` + (k === "sheer" ? sheerVeil : "");
   const capShort =
     `<path d="M34,46 C 32,34 45,27 60,27 C 75,27 88,34 86,46 C 82,43 78,43 74,44 Q67,40 60,40 Q53,40 46,44 C 42,43 38,43 34,46 Z" fill="${hair}" ${S}/>`;
   const braid = (cx, topY, seg) => {
@@ -1143,7 +1186,7 @@ function portraitSVG(v){
   const segFor = len==="veryLong"?7 : len==="long"?6 : 4;
 
   // 後ろ髪・前髪・付属を組み立てる
-  let hBack="", hFront="", hHang="", hUnder="";
+  let hBack="", hFront="", hHang="", hUnder="", useCap=false;
   if(len==="bald"){
     hFront = "";
   }else if(len==="veryShort"){
@@ -1151,9 +1194,9 @@ function portraitSVG(v){
   }else if(style==="down"){
     /* おろした髪だけは、身体より奥（服より下）に置く */
     hUnder = `<path d="${backDown[len] || backDown.short}" fill="${hair}" ${S}/>`;
-    hFront = cap;
+    useCap = true;
   }else{ // 結った髪
-    hFront = cap;
+    useCap = true;
     if(style==="bun"){
       /* お団子は頭の後ろ。頭より奥に置いて、後頭部からのぞくようにする */
       hBack = `<ellipse cx="60" cy="22" rx="11" ry="9.5" fill="${hair}" ${S}/>`+
@@ -1173,11 +1216,16 @@ function portraitSVG(v){
 
   /* ---- 顔の部品 ---- */
   const browY = 51 + (rnd()*2-1);
-  const browTilt = (rnd()*3);
+  /* 眉は、目じり側と目がしら側の高さの差で表情が変わる。
+     マイナスでつり眉、0あたりで並行、プラスで困り眉（八の字）。 */
+  const browTilt = rnd()*6.5 - 2.5;
   const browCol = darkSkin ? mix(hairSh, "#f0e2d0", 0.5) : hairSh;
+  const browOut = (browY + browTilt).toFixed(1);          // 目じり側
+  const browIn  = (browY - browTilt*0.55).toFixed(1);     // 目がしら側
+  const browMid = (browY - 2 + browTilt*0.25).toFixed(1); // 眉山
   const brows =
-    `<path d="M42,${(browY + +browTilt).toFixed(1)} Q48,${(browY - 2).toFixed(1)} 54,${(browY + +browTilt * 0.4).toFixed(1)}" fill="none" stroke="${browCol}" stroke-width="1.5" stroke-linecap="round"/>` +
-    `<path d="M66,${(browY + +browTilt * 0.4).toFixed(1)} Q72,${(browY - 2).toFixed(1)} 78,${(browY + +browTilt).toFixed(1)}" fill="none" stroke="${browCol}" stroke-width="1.5" stroke-linecap="round"/>`;
+    `<path d="M42,${browOut} Q48,${browMid} 54,${browIn}" fill="none" stroke="${browCol}" stroke-width="1.5" stroke-linecap="round"/>` +
+    `<path d="M66,${browIn} Q72,${browMid} 78,${browOut}" fill="none" stroke="${browCol}" stroke-width="1.5" stroke-linecap="round"/>`;
   const eyes = darkSkin
     ? ["47.5", "72.5"].map(cx =>
       `<ellipse cx="${cx}" cy="62" rx="3.6" ry="4.4" fill="#f2e7d8"/>` +
@@ -1198,6 +1246,18 @@ function portraitSVG(v){
   }else{                           // 無表情（ほぼ直線）
     mouth = `<path d="M56,79.4 Q60,80.4 64,79.4" fill="none" stroke="${mouthCol}" stroke-width="1.4" stroke-linecap="round"/>`;
   }
+  /* 前髪の型。rnd() は既存の5つ（服・かたむき・眉2つ・口もと）より後で呼ぶこと。
+     手前に足すと、すでにいる村人の顔つきまで変わってしまう。 */
+  let fringeKind = "";
+  if(useCap){
+    fringeKind = FRINGE_KEYS[Math.floor(rnd()*FRINGE_KEYS.length)];
+    hFront = capFor(fringeKind);
+  }
+  /* 前髪は眉にかかる。眉を前髪より先に描いて、かぶったぶんだけ隠れるようにする。
+     ただし頭巾をかぶっている人は、頭巾のすそが眉までおりてくるので眉を上に描く。 */
+  const fringeHidesBrows = useCap && !scarf;
+  const browsUnder = fringeHidesBrows ? brows : "";
+  const browsOver  = fringeHidesBrows ? "" : brows;
   const freckles = freckle
     ? `<g fill="${darkSkin ? shade(skin, 0.2) : shade(skin, -0.16)}" opacity=".6"><circle cx="45" cy="67" r="0.9"/><circle cx="49" cy="69" r="0.9"/><circle cx="71" cy="69" r="0.9"/><circle cx="75" cy="67" r="0.9"/><circle cx="60" cy="70" r="0.8"/></g>`
     : "";
@@ -1225,9 +1285,10 @@ function portraitSVG(v){
       <ellipse cx="88.5" cy="64" rx="4.5" ry="6" fill="${skin}" ${Stf}/>
       <ellipse cx="60" cy="60" rx="28.5" ry="32" fill="${skin}" ${Sf}/>
       <ellipse cx="60" cy="83" rx="13" ry="5" fill="${skinSh}" opacity=".28"/>
+      ${browsUnder}
       ${hFront}
       ${scarfEl}
-      ${brows}
+      ${browsOver}
       ${eyes}
       ${glassesEl}
       ${nose}
@@ -1796,8 +1857,9 @@ function renderPeek(){
   }
   const ap = v.appearance || {};
   const styleJP = (ap.hairStyle && ap.hairStyle !== "down") ? "・" + HAIR_STYLE_JP[ap.hairStyle] : "";
+  const texJP = ap.hairTexture ? "・" + ap.hairTexture : "";
   const looks =
-    `${ap.hairColorName||""}の髪（${HAIR_LEN_JP[ap.hairLength]||""}${styleJP}）、${ap.eyeColorName||""}の瞳、${ap.skinColorName||""}の肌。` +
+    `${ap.hairColorName||""}の髪（${HAIR_LEN_JP[ap.hairLength]||""}${texJP}${styleJP}）、${ap.eyeColorName||""}の瞳、${ap.skinColorName||""}の肌。` +
     (ap.otherFeatures ? " " + ap.otherFeatures : "");
   const sect = (h3, text, id) =>
     text ? `<div class="sect"><h3>${h3}</h3><p${id ? ` id="${id}"` : ""}>${esc(text)}</p></div>` : "";
@@ -2015,8 +2077,9 @@ function openVillager(i){
   $("vmAge").textContent = v.age + (ap.apparentAge ? `（見た目は ${ap.apparentAge}）` : "");
   $("vmSince").textContent = v.arrivedAt ? fmtDate(v.arrivedAt) + " から村にいる" : "";
   const styleJP = (ap.hairStyle && ap.hairStyle !== "down") ? "・" + HAIR_STYLE_JP[ap.hairStyle] : "";
+  const texJP = ap.hairTexture ? "・" + ap.hairTexture : "";
   $("vmLooks").textContent =
-    `${ap.hairColorName||""}の髪（${HAIR_LEN_JP[ap.hairLength]||""}${styleJP}）、${ap.eyeColorName||""}の瞳、${ap.skinColorName||""}の肌。` +
+    `${ap.hairColorName||""}の髪（${HAIR_LEN_JP[ap.hairLength]||""}${texJP}${styleJP}）、${ap.eyeColorName||""}の瞳、${ap.skinColorName||""}の肌。` +
     (ap.otherFeatures ? " " + ap.otherFeatures : "");
   $("vmPersonality").textContent = v.personality || "";
   /* ひとづきあいは、あとから足した項目。持っていない村人は、その場で書き起こす */
