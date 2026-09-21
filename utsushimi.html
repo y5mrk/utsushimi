@@ -479,6 +479,7 @@
     <div class="lockNote">この設定は、あたえられたときのまま。あなたにも、この道具にも、書き換えることはできません。（立ち絵の画像だけは、あなたが差し替えたり消したりできます。）</div>
     <div class="sect"><h3>すがた</h3><p id="vmLooks"></p></div>
     <div class="sect"><h3>ひととなり</h3><p id="vmPersonality"></p></div>
+    <div class="sect"><h3>ひとづきあい</h3><p id="vmSociability"></p></div>
     <div class="sect"><h3>すきなこと</h3><p id="vmHobbies"></p></div>
     <div class="sect"><h3>これまでのこと</h3><p id="vmPast"></p></div>
     <div class="sect"><h3>おさないころ</h3><p id="vmChildhood"></p></div>
@@ -727,7 +728,8 @@ const VILLAGER_SCHEMA = `{
         "apparentAge": "見た目の年齢。『二十代半ばに見える』のように人間としてありうる年齢の言い方で必ず書く。『人間でいうと』などの前置きはつけない",
         "otherFeatures": "そのほか外見の特徴を1〜2文で"
       },
-      "personality": "性格。冒頭でひととなりと人づきあいがわかるように書き、エピソードを交えた散文で3〜6文",
+      "personality": "性格。冒頭でひととなりがわかるように書き、エピソードを交えた散文で3〜6文",
+      "sociability": "人づきあい。乱数制約の「人づきあい」をもとに、人との距離のとり方をエピソードを交えた散文で2〜4文",
       "hobbies": "趣味趣向。散文で2〜4文",
       "past": "過去の出来事。散文で3〜6文",
       "childhood": "幼少期の家庭環境。散文で3〜6文",
@@ -750,7 +752,8 @@ ${worldRule}
 ${ageRule}
 - apparentAge は「二十代半ばに見える」「六十を過ぎたくらいに見える」のように、人間としてありうる年齢の言い方だけで書くこと。「人間でいうと」「人間にたとえると」といった前置きや、人外であることをほのめかす言い回しは書かないこと。
 - hairStyle は乱数制約で与えられた値をそのまま返し、外見の描写（otherFeatures など）にも矛盾しないように反映すること。
-- personality は、はじめの1〜2文で「ひととなり」と「人づきあい」がはっきり伝わるように書き、そのあとに具体的なエピソードを続けること。性格をぼかしたり、含みをもたせて伏せたりしないこと。
+- personality は、はじめの1〜2文で乱数制約の「ひととなり」がはっきり伝わるように書き、そのあとに具体的なエピソードを続けること。性格をぼかしたり、含みをもたせて伏せたりしないこと。乱数制約の「人づきあい」とも矛盾させないこと（たとえば「人見知りで、口数がすくない」人を、だれとでもすぐ打ちとける人物として描かないこと）。
+- sociability には乱数制約の「人づきあい」を書くこと。だれとどう話すか、村の集まりでどうふるまうか、はじめて会う相手にどう出るかなど、人との距離のとり方が目に浮かぶように、具体的な場面をまじえて書くこと。personality と同じ内容をくりかえさないこと。
 - ひととなりが明るい人・外向的な人は、そのまま明るく外向的に描くこと。だれもかれもを物静かで内省的な人物にしないこと。意地悪・偏屈・高慢といった難のある性格も、そのとおりに描いてよい（読み手に嫌われないよう和らげなくてよい）。
 - 文章のフィールドはパラメータの列挙ではなく、具体的なエピソードを含む散文で書くこと。
 - 「発想の種」の3語から連想を飛ばして性格・過去・趣味などに反映すること。ただし語そのものを不自然に多用しないこと。
@@ -823,6 +826,32 @@ ${commonRules()}
 
 # 出力形式（JSONのみ）
 ${VILLAGER_SCHEMA}`;
+}
+
+/* 「ひとづきあい」を持っていない村人のために、いまある設定から書き起こす。
+   設定を足すのではなく、すでに決まっていることを読みとって言いなおすだけ。 */
+function buildSociabilityPrompt(v){
+  const ap = v.appearance || {};
+  return `「${state.villageName}」（${state.villageDescription||""}）という村に暮らす、ある村人について、その「人づきあい」だけを書き起こしてください。
+
+# この人の設定（すべて確定ずみ。書き換えてはいけません）
+- 名前: ${v.name}
+- 年齢: ${v.age}
+- すがた: ${ap.otherFeatures || "（記載なし）"}
+- ひととなり: ${v.personality || "（記載なし）"}
+- すきなこと: ${v.hobbies || "（記載なし）"}
+- これまでのこと: ${v.past || "（記載なし）"}
+- おさないころ: ${v.childhood || "（記載なし）"}
+- 村のひとたちと: ${v.relationships || "（記載なし）"}
+
+# 書き方
+- 上の設定から読みとれる人づきあいを書くこと。あたらしい性格や来歴を足さないこと。上の設定と矛盾することを書かないこと。
+- だれとどう話すか、村の集まりでどうふるまうか、はじめて会う相手にどう出るかなど、人との距離のとり方が目に浮かぶように、具体的な場面をまじえて散文で2〜4文。
+- 「ひととなり」に書かれていることをそのままくりかえさないこと。
+- 出力は有効なJSONのみ。コードブロックや説明文をつけないこと。
+
+# 出力形式（JSONのみ）
+{ "sociability": "人づきあい（散文で2〜4文）" }`;
 }
 
 function buildBulletinPrompt(targetDateJP, prevBoard){
@@ -1767,6 +1796,26 @@ function openReader(id){
   $("readerBody").textContent = n.body;
 }
 
+/* 書き起こし中の村人index。同じ人に何度も投げないための見張り */
+const sociabilityJobs = new Set();
+async function ensureSociability(i){
+  const v = state.villagers[i];
+  if(!v || v.sociability || sociabilityJobs.has(i)) return;
+  sociabilityJobs.add(i);
+  try{
+    const raw = await callClaude(buildSociabilityPrompt(v), 700);
+    const text = String((raw && raw.sociability) || "").trim();
+    if(!text) throw new Error("からの返答でした");
+    v.sociability = text;
+    save();
+    if(curVillager === i) $("vmSociability").textContent = text;
+  }catch(err){
+    if(curVillager === i) $("vmSociability").textContent = "（いまは書き起こせませんでした。もう一度ひらくと、やり直します）";
+  }finally{
+    sociabilityJobs.delete(i);
+  }
+}
+
 function openVillager(i){
   const v = state.villagers[i];
   const ap = v.appearance || {};
@@ -1781,6 +1830,9 @@ function openVillager(i){
     `${ap.hairColorName||""}の髪（${HAIR_LEN_JP[ap.hairLength]||""}${styleJP}）、${ap.eyeColorName||""}の瞳、${ap.skinColorName||""}の肌。` +
     (ap.otherFeatures ? " " + ap.otherFeatures : "");
   $("vmPersonality").textContent = v.personality || "";
+  /* ひとづきあいは、あとから足した項目。持っていない村人は、その場で書き起こす */
+  $("vmSociability").textContent = v.sociability || "書き起こしています…";
+  if(!v.sociability) ensureSociability(i);
   $("vmHobbies").textContent = v.hobbies || "";
   $("vmPast").textContent = v.past || "";
   $("vmChildhood").textContent = v.childhood || "";
@@ -1889,7 +1941,7 @@ async function welcome(){
   busy = true;
   hideError();
   try{
-    const raw = await generate(buildNewVillagerPrompt(), 3000, validOne, "新しい村人を迎える");
+    const raw = await generate(buildNewVillagerPrompt(), 3400, validOne, "新しい村人を迎える");
     const nv = acceptVillager(raw);
     state.lastVillagerAt += WEEK;
     save();
@@ -1910,7 +1962,7 @@ async function invite(){
   hideError();
   if(state.mode === "api") showLoading("あなたの声に、だれかが振り向きました");
   try{
-    const raw = await generate(buildNewVillagerPrompt(), 3000, validOne, "新しい村人を招く");
+    const raw = await generate(buildNewVillagerPrompt(), 3400, validOne, "新しい村人を招く");
     const nv = acceptVillager(raw);
     save();
     renderAll();
@@ -1944,7 +1996,7 @@ $("startBtn").onclick = async () => {
   $("startBtn").disabled = true;
   showLoading("村がうまれています");
   try{
-    const raw = await generate(buildInitialPrompt(), 4500, validInitial, "村と、最初の3人をつくる");
+    const raw = await generate(buildInitialPrompt(), 5200, validInitial, "村と、最初の3人をつくる");
     state.villageName = raw.villageName || "名もない村";
     state.villageDescription = raw.villageDescription || "";
     const now = Date.now();
