@@ -122,7 +122,8 @@
   /* ---------- write ---------- */
   #faceStrip{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px;}
   #faceStrip button{background:none; border:1px solid transparent; border-radius:8px; padding:2px;}
-  #faceStrip button:hover{border-color:var(--line); background:var(--card);}
+  #faceStrip button:hover{border-color:var(--line); background:var(--paper2);}
+  #faceStrip button.active{border-color:var(--accent); background:rgba(90,125,90,.12);}
   #faceStrip svg{width:44px; height:auto; display:block;}
   #writeView input#novelTitle{
     width:100%; border:none; border-bottom:1px solid var(--line); background:transparent;
@@ -133,15 +134,47 @@
     background:var(--card); padding:20px 22px; font-size:15px; line-height:2.0; resize:vertical;
   }
   #writeView .actions{display:flex; align-items:center; gap:14px; margin-top:14px;}
+  /* 「物語をかく」は、書く側と設定を見る側の2枚ならび */
+  #writeSplit{ display:grid; grid-template-columns:minmax(0,1fr) 310px; gap:22px; align-items:start; }
+  #peekPane{
+    position:sticky; top:14px; max-height:calc(100vh - 120px); overflow:auto;
+    border:1px solid var(--line); border-radius:12px; background:var(--card); padding:14px 16px 18px;
+  }
+  #peekBody .sect h3{ margin:14px 0 3px; }
+  #peekBody .sect p{ font-size:13px; line-height:1.9; }
+  .peekEmpty{ font-size:12.5px; color:var(--ink-soft); line-height:1.9; }
+  .peekHead{ display:flex; align-items:flex-start; gap:10px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+  /* 立ち絵は縮ませない。名前や見た目年齢が何行になっても同じ大きさ（4:5） */
+  .peekHead svg, .peekHead .pfp{ flex:0 0 auto; width:52px; height:65px; display:block; }
+  .peekHead > div{ min-width:0; }
+  .peekTabs{ display:flex; gap:4px; margin:-2px -4px 12px; }
+  .peekTab{ flex:1; background:none; border:none; border-bottom:1px solid var(--line);
+    padding:7px 0 8px; font-size:12.5px; letter-spacing:.12em; color:var(--ink-soft);
+    transition:color .2s, border-color .2s; }
+  .peekTab:hover{ color:var(--ink); }
+  .peekTab.active{ color:var(--ink); border-bottom:2px solid var(--accent); }
+  #peekBoardTab .bbNav{ margin:2px 0 12px; }
+  #peekBoardTab .bbText{ font-size:13px; line-height:1.9; }
+  #bbList2{ display:flex; flex-direction:column; gap:10px; }
+  /* カスタム立ち絵のときは、スワイプの枠も同じ大きさにそろえる */
+  #peekBody .pfpSwipe{ width:52px; }
+  #peekBody .pfpDots{ margin-top:5px; }
+  #peekBody .pfpDots span{ width:5px; height:5px; }
+  .peekName{ font-size:15px; letter-spacing:.1em; }
+  .peekAge{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  @media (max-width:820px){
+    #writeSplit{ grid-template-columns:1fr; }
+    #peekPane{ position:static; max-height:none; }
+  }
   #writeView .hint{font-size:12px; color:var(--ink-soft);}
 
   /* ---------- library ---------- */
   .novelItem{
     width:100%; text-align:left; background:var(--card); border:1px solid var(--line);
-    border-radius:10px; padding:14px 20px; margin-bottom:10px;
+    border-radius:10px; padding:14px 20px; margin-bottom:10px; color:var(--ink);
   }
   .novelItem:hover{background:var(--card);}
-  .novelItem .t{font-size:16px; letter-spacing:.05em;}
+  .novelItem .t{font-size:16px; letter-spacing:.05em; color:var(--ink);}
   .novelItem .meta{font-size:12px; color:var(--ink-soft); margin-top:2px;}
   #reader{display:none;}
   #reader .back{background:none; border:none; color:var(--accent-dark); font-size:13px; margin-bottom:16px; letter-spacing:.1em;}
@@ -350,6 +383,11 @@
   .vpBtn .nm{ font-size:11px; letter-spacing:.05em; display:block; margin-top:3px; color:var(--ink-soft); }
   .vpBtn.active{ border-color:var(--accent); background:rgba(90,125,90,.12); }
   .vpBtn.active .nm{ color:var(--ink); }
+  /* 「三人称視点」は立ち絵のかわりに印を置き、顔と同じ高さにそろえる */
+  .vpThird{ display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:58px; }
+  .vpThird .mark{ display:block; font-size:21px; line-height:1; color:var(--ink-soft); height:38px;
+    display:flex; align-items:center; justify-content:center; }
+  .vpThird.active .mark{ color:var(--accent); }
 
   /* タグ（書きだめ帳・リーダー） */
   #tagFilterRow{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
@@ -434,17 +472,45 @@
   </section>
 
   <section id="writeView" style="display:none">
-    <div id="faceStrip"></div>
-    <input id="novelTitle" placeholder="題（なくてもよい）">
-    <div id="viewpointPicker">
-      <div class="vpLabel">視点人物（複数選択可）</div>
-      <div id="viewpointStrip"></div>
-    </div>
-    <textarea id="novelBody" placeholder="ここに、彼らの物語を。"></textarea>
-    <div class="actions">
-      <button class="primary" id="saveNovelBtn" style="margin:0">書きとめる</button>
-      <button class="ghostBtn" id="cancelEditBtn" style="display:none">編集をやめる</button>
-      <span class="hint" id="writeHint">保存した物語は「書きだめ帳」から読み返せます。</span>
+    <div id="writeSplit">
+
+      <!-- 左：書くところ -->
+      <div id="writePane">
+        <input id="novelTitle" placeholder="題（なくてもよい）">
+        <div id="viewpointPicker">
+          <div class="vpLabel">視点人物（複数選択可）</div>
+          <div id="viewpointStrip"></div>
+        </div>
+        <textarea id="novelBody" placeholder="ここに、彼らの物語を。"></textarea>
+        <div class="actions">
+          <button class="primary" id="saveNovelBtn" style="margin:0">書きとめる</button>
+          <button class="ghostBtn" id="cancelEditBtn" style="display:none">編集をやめる</button>
+          <span class="hint" id="writeHint">保存した物語は「書きだめ帳」から読み返せます。</span>
+        </div>
+      </div>
+
+      <!-- 右：設定を見るところ -->
+      <aside id="peekPane">
+        <div class="peekTabs">
+          <button class="peekTab active" data-peek="villager">村人</button>
+          <button class="peekTab" data-peek="board">掲示板</button>
+        </div>
+
+        <div id="peekVillagerTab">
+          <div id="faceStrip"></div>
+          <div id="peekBody"></div>
+        </div>
+
+        <div id="peekBoardTab" style="display:none">
+          <div class="bbNav">
+            <button class="bbArrow" id="bbPrev2" aria-label="前の日">‹</button>
+            <div class="bbDate" id="bbDate2"></div>
+            <button class="bbArrow" id="bbNext2" aria-label="次の日">›</button>
+          </div>
+          <div id="bbList2"></div>
+        </div>
+      </aside>
+
     </div>
   </section>
 
@@ -562,7 +628,10 @@ let lastFailedJob = null;
 let editingId = null;      // 編集中の物語ID（新規のときは null）
 let currentReaderId = null; // いま開いている物語ID
 let curVillager = -1;       // モーダルで開いている村人のindex
-let selectedViewpoints = []; // 執筆中に選択している視点人物（村人indexの配列）
+let peekVillager = -1;      // 「物語をかく」の右側に出している村人のindex
+const VP_THIRD = -1;         // 視点人物のかわりに「三人称視点」をえらんだときの印
+const VP_THIRD_JP = "三人称視点";
+let selectedViewpoints = []; // 執筆中に選択している視点人物（村人index、または VP_THIRD の配列）
 let activeTagFilters = [];   // 書きだめ帳の絞り込みに使う視点人物タグ（村人indexの配列）
 let activeAuthorFilters = []; // 書きだめ帳の絞り込みに使う執筆者タグ（"あなた"などの文字列の配列）
 let bbBusy = false;  // 村の掲示板を生成中かどうか
@@ -1169,17 +1238,24 @@ function portraitHTML(v){
 
 /* 村人モーダルの立ち絵。カスタム画像があるときだけ、
    「設定した立ち絵」と「既定のイラスト」を横スワイプで見くらべられる。最初は設定した方。 */
-function renderVmPortrait(v){
-  const host = $("vmPortrait");
+/* カスタム立ち絵があるときの中身。スワイプで既定のイラストも見られる。
+   カスタムが無ければ null（＝ふつうにSVGを出せばよい） */
+function portraitSwipeHTML(v){
   const c = customPortrait(v);
-  if(!c){ host.className = ""; host.innerHTML = portraitSVG(v); return; }
-  host.className = "pfpSwipeWrap";
-  host.innerHTML =
-    `<div class="pfpSwipe"><div class="pfpTrack">`
+  if(!c) return null;
+  return `<div class="pfpSwipe"><div class="pfpTrack">`
     + `<div class="pfpPane"><img class="pfp" src="${c}" alt=""></div>`
     + `<div class="pfpPane">${portraitSVG(v)}</div>`
     + `</div></div>`
     + `<div class="pfpDots"><span class="on"></span><span></span></div>`;
+}
+
+function renderVmPortrait(v){
+  const host = $("vmPortrait");
+  const sw = portraitSwipeHTML(v);
+  if(!sw){ host.className = ""; host.innerHTML = portraitSVG(v); return; }
+  host.className = "pfpSwipeWrap";
+  host.innerHTML = sw;
   bindPfpSwipe(host);
 }
 
@@ -1617,27 +1693,34 @@ function renderCountdown(){
   el.textContent = `つぎの村人がやってくるまで、あと${d}日と${h}時間`;
 }
 
+/* 掲示板は「村」と「物語をかく」の右側、2か所に出る。
+   bbViewIndex は共通なので、どちらで日をめくっても同じ日が出る。 */
 function renderBulletin(){
   if(!state) return;
+  renderBulletinInto("");    // 村の画面
+  renderBulletinInto("2");   // 「物語をかく」の右側
+}
+function renderBulletinInto(sfx){
+  if(!$("bbList" + sfx)) return;
   const log = state.bulletinLog || [];
   const target = bulletinTargetDate();
   const pinned = bbViewIndex !== null && bbViewIndex >= 0 && bbViewIndex < log.length;
   const board = pinned ? log[bbViewIndex] : (log.length ? log[log.length-1] : null);
   const showingLive = !pinned; // 最新（生成中・失敗の可能性がある枠）を見ているか
 
-  $("bbDate").textContent = fmtDateKeyJP(board ? board.date : target) + "のできごと";
+  $("bbDate" + sfx).textContent = fmtDateKeyJP(board ? board.date : target) + "のできごと";
   const curIdx = pinned ? bbViewIndex : log.length - 1;
-  $("bbPrev").disabled = curIdx <= 0;
-  $("bbNext").disabled = !pinned;
+  $("bbPrev" + sfx).disabled = curIdx <= 0;
+  $("bbNext" + sfx).disabled = !pinned;
 
-  const list = $("bbList");
+  const list = $("bbList" + sfx);
   list.innerHTML = "";
 
   if(showingLive){
     if(bbBusy){ list.innerHTML = `<div class="bbMsg">掲示板を書いています…</div>`; return; }
     if(bbError){
-      list.innerHTML = `<div class="bbMsg bbErr">${esc(bbError)}<button class="miniBtn" id="bbRetry">再試行</button></div>`;
-      $("bbRetry").onclick = () => checkBulletin(); // 残っている未生成分から再開
+      list.innerHTML = `<div class="bbMsg bbErr">${esc(bbError)}<button class="miniBtn" id="bbRetry${sfx}">再試行</button></div>`;
+      $("bbRetry" + sfx).onclick = () => checkBulletin(); // 残っている未生成分から再開
       return;
     }
     if(!board){
@@ -1665,8 +1748,9 @@ function renderFaceStrip(){
   state.villagers.forEach((v,i) => {
     const b = document.createElement("button");
     b.title = v.name;
+    b.className = (i === peekVillager) ? "active" : "";
     b.innerHTML = portraitHTML(v);
-    b.onclick = () => openVillager(i);
+    b.onclick = () => { peekVillager = i; renderFaceStrip(); renderPeek(); };
     s.appendChild(b);
   });
 }
@@ -1674,6 +1758,49 @@ function renderFaceStrip(){
 function renderAll(){ renderHeader(); renderVillage(); renderFaceStrip(); renderBulletin(); }
 
 /* 執筆画面：視点人物のトグル選択 */
+/* 右ペインのタブ。"villager"（村人の設定）か "board"（村の掲示板） */
+let peekTab = "villager";
+function switchPeekTab(tab){
+  peekTab = tab;
+  document.querySelectorAll(".peekTab").forEach(b => b.classList.toggle("active", b.dataset.peek === tab));
+  $("peekVillagerTab").style.display = tab === "villager" ? "" : "none";
+  $("peekBoardTab").style.display    = tab === "board"    ? "" : "none";
+  if(tab === "board") renderBulletin();
+}
+
+/* 「物語をかく」の右側。えらんだ村人の設定を、書きながら読めるようにする */
+function renderPeek(){
+  const box = $("peekBody");
+  if(!box) return;
+  const v = state.villagers[peekVillager];
+  if(!v){
+    box.innerHTML = `<p class="peekEmpty">人物を選択するとその人の設定が表示されます。</p>`;
+    return;
+  }
+  const ap = v.appearance || {};
+  const styleJP = (ap.hairStyle && ap.hairStyle !== "down") ? "・" + HAIR_STYLE_JP[ap.hairStyle] : "";
+  const looks =
+    `${ap.hairColorName||""}の髪（${HAIR_LEN_JP[ap.hairLength]||""}${styleJP}）、${ap.eyeColorName||""}の瞳、${ap.skinColorName||""}の肌。` +
+    (ap.otherFeatures ? " " + ap.otherFeatures : "");
+  const sect = (h3, text, id) =>
+    text ? `<div class="sect"><h3>${h3}</h3><p${id ? ` id="${id}"` : ""}>${esc(text)}</p></div>` : "";
+  const sw = portraitSwipeHTML(v);
+  box.innerHTML =
+    `<div class="peekHead">${sw ? `<div class="pfpSwipeWrap">${sw}</div>` : portraitHTML(v)}<div>` +
+      `<h3 class="peekName">${esc(v.name)}</h3>` +
+      `<div class="peekAge">${esc(v.age)}${ap.apparentAge ? `（見た目は ${esc(ap.apparentAge)}）` : ""}</div>` +
+    `</div></div>` +
+    sect("すがた", looks) +
+    sect("ひととなり", v.personality) +
+    sect("ひとづきあい", v.sociability || "書き起こしています…", "peekSociability") +
+    sect("すきなこと", v.hobbies) +
+    sect("これまでのこと", v.past) +
+    sect("おさないころ", v.childhood) +
+    sect("村のひとたちと", v.relationships);
+  if(sw) bindPfpSwipe(box.querySelector(".pfpSwipeWrap"));
+  if(!v.sociability) ensureSociability(peekVillager);
+}
+
 function renderViewpointStrip(){
   const s = $("viewpointStrip");
   s.innerHTML = "";
@@ -1684,11 +1811,29 @@ function renderViewpointStrip(){
     b.innerHTML = portraitHTML(v) + `<span class="nm">${esc(v.name)}</span>`;
     b.onclick = () => {
       const idx = selectedViewpoints.indexOf(i);
-      if(idx >= 0) selectedViewpoints.splice(idx,1); else selectedViewpoints.push(i);
+      if(idx >= 0){
+        selectedViewpoints.splice(idx,1);
+      }else{
+        // 人物をえらんだら「三人称視点」は外れる
+        selectedViewpoints = selectedViewpoints.filter(x => x !== VP_THIRD);
+        selectedViewpoints.push(i);
+      }
       renderViewpointStrip();
     };
     s.appendChild(b);
   });
+
+  // だれの目でもなく書くとき。村人が何人いても、いちばん最後に置く。
+  const third = document.createElement("button");
+  third.type = "button";
+  third.className = "vpBtn vpThird" + (selectedViewpoints.includes(VP_THIRD) ? " active" : "");
+  third.innerHTML = `<span class="mark">∅</span><span class="nm">${VP_THIRD_JP}</span>`;
+  third.title = "だれか一人の目ではなく、外から村を見わたして書く";
+  third.onclick = () => {
+    selectedViewpoints = selectedViewpoints.includes(VP_THIRD) ? [] : [VP_THIRD];
+    renderViewpointStrip();
+  };
+  s.appendChild(third);
 }
 
 /* 書きだめ帳：タグ絞り込み行（執筆者タグ・視点人物タグをグループごとに表示。グループ内はOR、グループ間はAND） */
@@ -1729,10 +1874,11 @@ function renderTagFilterRow(){
     label.className = "tagGroupLabel";
     label.textContent = "視点人物";
     row.appendChild(label);
-    [...viewpoints].sort((a,b)=>a-b).forEach(i => {
-      const v = state.villagers[i];
-      if(!v) return;
-      renderTagFilterChip(row, v.name, activeTagFilters.includes(i), () => {
+    // 三人称視点（-1）は最後にまわす
+    [...viewpoints].sort((a,b) => (a===VP_THIRD) - (b===VP_THIRD) || a-b).forEach(i => {
+      const name = i === VP_THIRD ? VP_THIRD_JP : (state.villagers[i]||{}).name;
+      if(!name) return;
+      renderTagFilterChip(row, name, activeTagFilters.includes(i), () => {
         const idx = activeTagFilters.indexOf(i);
         if(idx >= 0) activeTagFilters.splice(idx,1); else activeTagFilters.push(i);
       });
@@ -1777,9 +1923,9 @@ function renderLibrary(){
    執筆者はユーザー保存時は常に「あなた」。将来のAI生成時は「わたし（記録係）」を想定（この画面からは変更不可）。 */
 function tagsHTML(n){
   let html = `<span class="tagGroupLabel">執筆者：</span><span class="tagBadge author">${esc(n.author || "あなた")}</span>`;
-  const vp = (n.viewpoints||[]).map(i => state.villagers[i]).filter(Boolean);
+  const vp = (n.viewpoints||[]).map(i => i === VP_THIRD ? VP_THIRD_JP : (state.villagers[i]||{}).name).filter(Boolean);
   if(vp.length){
-    html += `<span class="tagGroupLabel">視点人物：</span>` + vp.map(v => `<span class="tagBadge">${esc(v.name)}</span>`).join("");
+    html += `<span class="tagGroupLabel">視点人物：</span>` + vp.map(nm => `<span class="tagBadge">${esc(nm)}</span>`).join("");
   }
   return html;
 }
@@ -1798,6 +1944,11 @@ function openReader(id){
   $("readerBody").textContent = n.body;
 }
 
+/* 書き起こせた／書き起こせなかった文を、開いている画面に出す */
+function showSociability(i, text){
+  if(curVillager === i) $("vmSociability").textContent = text;
+  if(peekVillager === i && $("peekSociability")) $("peekSociability").textContent = text;
+}
 /* 書き起こし中の村人index。同じ人に何度も投げないための見張り */
 const sociabilityJobs = new Set();
 async function ensureSociability(i){
@@ -1810,9 +1961,9 @@ async function ensureSociability(i){
     if(!text) throw new Error("からの返答でした");
     v.sociability = text;
     save();
-    if(curVillager === i) $("vmSociability").textContent = text;
+    showSociability(i, text);
   }catch(err){
-    if(curVillager === i) $("vmSociability").textContent = "（いまは書き起こせませんでした。もう一度ひらくと、やり直します）";
+    showSociability(i, "（いまは書き起こせませんでした。もう一度ひらくと、やり直します）");
   }finally{
     sociabilityJobs.delete(i);
   }
@@ -2019,7 +2170,7 @@ function switchToView(view){
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x.dataset.view === view));
   ["villageView","writeView","libraryView"].forEach(v => $(v).style.display = v === view ? "" : "none");
   if(view === "libraryView") renderLibrary();
-  if(view === "writeView"){ renderFaceStrip(); renderViewpointStrip(); }
+  if(view === "writeView"){ renderFaceStrip(); renderViewpointStrip(); renderPeek(); }
 }
 
 /* 編集中かどうかで「書きとめる」画面の見た目を切り替える */
@@ -2143,17 +2294,24 @@ $("welcomeBtn").onclick = welcome;
 $("inviteBtn").onclick = invite;
 
 /* 村の掲示板：過去の日付を遡る／最新に戻る */
-$("bbPrev").onclick = () => {
-  const log = state.bulletinLog || [];
-  const curIdx = (bbViewIndex !== null && bbViewIndex < log.length) ? bbViewIndex : log.length - 1;
-  if(curIdx > 0){ bbViewIndex = curIdx - 1; renderBulletin(); }
-};
-$("bbNext").onclick = () => {
-  const log = state.bulletinLog || [];
-  if(bbViewIndex === null) return;
-  bbViewIndex = (bbViewIndex < log.length - 1) ? bbViewIndex + 1 : null;
-  renderBulletin();
-};
+["", "2"].forEach(sfx => {
+  $("bbPrev" + sfx).onclick = () => {
+    const log = state.bulletinLog || [];
+    const curIdx = (bbViewIndex !== null && bbViewIndex < log.length) ? bbViewIndex : log.length - 1;
+    if(curIdx > 0){ bbViewIndex = curIdx - 1; renderBulletin(); }
+  };
+  $("bbNext" + sfx).onclick = () => {
+    const log = state.bulletinLog || [];
+    if(bbViewIndex === null) return;
+    bbViewIndex = (bbViewIndex < log.length - 1) ? bbViewIndex + 1 : null;
+    renderBulletin();
+  };
+});
+
+/* 右ペインのタブ切りかえ */
+document.querySelectorAll(".peekTab").forEach(b => {
+  b.onclick = () => switchPeekTab(b.dataset.peek);
+});
 $("retryBtn").onclick = () => { hideError(); if(lastFailedJob) lastFailedJob(); };
 $("readerBack").onclick = renderLibrary;
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => closeModal(b.dataset.close));
