@@ -734,11 +734,24 @@ const SOCIAL = [
 const SEED_WORDS = ["井戸", "嘘", "灯台", "蜂", "留守番", "地図", "塩", "手紙", "梯子", "雨戸", "汽笛", "こだま", "タトゥー", "北風", "川底", "かなづち", "へそくり", "渡り鳥", "昼寝", "足あと", "そろばん", "真夜中", "豆", "古井戸", "口笛", "繕いもの", "石垣", "蜃気楼", "粉", "編み目", "おつかい", "忘れもの", "満月", "畑", "靴ひも", "湯気", "くしゃみ", "峠", "貝殻", "たき火", "地下室", "羅針盤", "仕立て", "蚕", "うわさ", "結び目", "日時計", "水たまり", "屋根裏", "鍵", "行商", "早起き", "茸", "写し絵", "こおろぎ", "粘土", "橋", "返事", "前掛け", "石臼", "雪解け", "名づけ", "逆立ち", "干し草", "呼び鈴", "遠眼鏡", "綴じ糸", "南京錠", "浮き輪", "休符", "接ぎ木", "算術", "果樹", "文鎮", "初雪", "たんこぶ", "帳面", "風見鶏", "納屋", "糸車", "返却", "朗読", "隠し味", "夜番", "伝言", "背くらべ", "空き瓶", "うたた寝", "霜", "虹", "夕立", "霧", "稲光", "雹", "陽炎", "木漏れ日", "影ふみ", "潮", "巣", "苗", "落ち葉", "蝉の抜け殻", "三日月", "海鳴り", "綿毛", "蔓", "松ぼっくり", "泥", "砂時計", "包丁", "鍋", "釜", "杓子", "火ばさみ", "ほうき", "桶", "樽", "秤", "物差し", "釘", "のこぎり", "鉋", "針", "糸", "ボタン", "継ぎあて", "洗濯ばさみ", "物干し", "麻袋", "藁", "縄", "荷車", "天秤棒", "薪", "炭", "火鉢", "湯たんぽ", "行灯", "蝋燭", "マッチ", "煙突", "煤", "竈", "蒸し器", "漬物石", "味噌", "酢", "干物", "種火", "麹", "樽底", "墨", "筆", "硯", "印鑑", "帳簿", "走り書き", "落書き", "署名", "暗号", "略図", "栞", "付箋", "余白", "あくび", "しゃっくり", "寝ぐせ", "靴ずれ", "ささくれ", "かさぶた", "白髪", "歯", "爪", "手のひら", "足首", "声変わり", "いびき", "寝言", "猫背", "迷子", "家出", "仲直り", "けんか", "約束", "内緒", "告げ口", "見張り", "順番", "相談", "勘違い", "言い訳", "見送り", "出迎え", "引っ越し", "夜逃げ", "落としもの", "拾いもの", "物々交換", "値切り", "分け前", "貸し借り", "恩返し", "仕返し", "賭け", "占い", "まじない", "お守り", "厄払い", "願かけ", "供えもの", "祭り", "盆踊り", "花火", "年越し", "大掃除", "衣替え", "田植え", "稲刈り", "種まき", "水やり", "薪割り", "井戸替え", "屋根ふき", "道普請", "虫送り", "沈黙", "ためらい", "焦り", "見栄", "未練", "後悔", "勘", "癖", "間", "縁起", "予感", "錯覚", "気配", "名残", "寝不足", "二日酔い", "居留守", "ひとりごと", "雨音", "足音", "遠雷", "鐘", "笛", "太鼓", "鈴", "拍子木", "焦げたにおい", "潮のにおい", "線香", "湯あみ", "寄り道", "抜け道", "近道", "裏木戸"];
 /* 見た目の年齢。実年齢とどれだけずれて見えるか */
 const LOOK_REAL = [["年相応に見える", 7], ["年より少し若く見える", 2], ["年より少し老けて見える", 2]];
-const LOOK_FANTASY = [["年相応に見える", 6], ["実年齢より若く見える", 2.5], ["実年齢よりずっと若く、年月が止まったように見える", 1.5],
-  ["実年齢より老けて見える", 2], ["見た目からは年齢の見当がつかない", 1.5]];
-/* 人間ばなれした年齢のとき、見た目はどのあたりに落ちつくか */
+const LOOK_FANTASY = [["実年齢より若く見える", 2.5], ["実年齢よりずっと若く、年月が止まったように見える", 1.5], ["見た目からは年齢の見当がつかない", 1.5]];
+/* 人間ばなれした年齢のとき、見た目はどのあたりに落ちつくか。
+   「実年齢より若く見える」では何も言ったことにならない齢なので、
+   ずれではなく、見た目そのものの年格好で指定する */
 const LOOK_INHUMAN = [["ごく若い、少年少女のように見える", 2], ["若い大人のように見える", 3.5], ["壮年のように見える", 2.5],
   ["年老いて見える", 2], ["見た目からは年齢の見当がつかない", 1.5]];
+
+/* 見た目の年齢を、どちらの表から引くか。
+   ファンタジーがオンでも、若いうちはたいてい年相応に見える。齢を重ねるほど、
+   現実ばなれした見えかたが混ざる。[この齢まで, LOOK_FANTASY を引く率] */
+const LOOK_FANTASY_RATE = [[39, 0.05], [64, 0.1], [110, 0.2]];
+function pickLook(ageN, fantasy){
+  if(!fantasy || ageN === null) return wpick(LOOK_REAL);
+  /* 人ならざる齢は、実年齢とのずれではなく、見た目の年格好そのものを引く */
+  if(ageN > 110) return wpick(LOOK_INHUMAN);
+  const band = LOOK_FANTASY_RATE.find(([upto]) => ageN <= upto);
+  return wpick(Math.random() < (band ? band[1] : 0.2) ? LOOK_FANTASY : LOOK_REAL);
+}
 
 /* ファンタジー要素を含むときだけ、この種も混ざる */
 const SEED_WORDS_FANTASY = ["妖精", "精霊", "竜", "人魚", "天狗", "河童", "座敷わらし", "化け猫", "狐火", "鬼火", "山の神", "泉の主", "名もなき神", "使い魔", "影法師", "幽霊", "亡霊", "生まれ変わり", "前世", "神隠し", "迷い家", "魔法", "異界の門", "鏡の向こう", "帰れない道", "湖の底の町", "雲の上の村", "地の底の川", "魔女", "まじない師", "星読み", "夢渡り", "夢喰い", "予言", "予言書", "古文書", "石碑", "ルーン", "護符", "呪符", "魔よけ", "結界", "封印", "封じられた扉", "呪い", "祝福", "願いをかなえる硬貨", "呪われた指輪", "銀の鍵", "錆びない剣", "消えない灯", "溶けない雪", "枯れない花", "無限の井戸", "薬草", "毒草", "霊薬", "万能薬", "錬金", "賢者の石", "魔法の豆", "空飛ぶ舟", "しゃべる木", "歩く石", "歌う骨", "不老", "不死", "百年の眠り", "時が止まる", "石になる", "羽が生える", "角", "尾", "鱗", "翼", "獣の言葉", "人化け", "逆さに降る雨", "二つの月", "三つめの目", "月の満ち欠けに従う", "影を売る", "名を奪われる", "鈴の音で来るもの"];
@@ -779,26 +792,38 @@ function ageNum(v){
   return isNaN(n) ? null : n;
 }
 /* あとから増える村人の年齢。すでにいる人たちを見て、足りていない段を厚く引く。
-   村ぜんたいの年齢構成が、人が増えるにつれ AGE_PYRAMID の割合へ寄っていく。
-   （最初の3人は参照する相手がいないので、ふつうに pyramidAge を使う）
+   村全体の年齢構成が、人が増えるにつれ狙ったAGE_PYRAMIDの割合へ寄っていく。
+   （最初の3人は参照する相手がいないので補正なし）
 
    重みは「不足ぶん」そのものではなく、もとの比に (1 + 2×不足) を掛ける。
    不足ぶんだけで引くと、薄い段（高齢）は目標が1人未満なので埋まったことにならず、
    厚い段が満たされたあとに残りの当たりが集まって、お年寄りばかりになってしまう。 */
 const BALANCE_STRENGTH = 2;
+/* ファンタジーのとき、人ならざる齢（111歳以上）が村に占める割合。
+   人のほうの段は 5〜110歳なので、そのすぐ上から始める */
+const INHUMAN_SHARE = 0.12;
+/* 割合の表。[下の齢, 上の齢, 村に占める割合]。
+   ファンタジーのときは人ならざる齢の段をひとつ足し、人のほうを (1 - 0.12) に圧縮する */
+function ageBands(){
+  const raw = AGE_PYRAMID.map(([a, b, perYear]) => [a, b, perYear * (b - a + 1)]);
+  const total = raw.reduce((s, x) => s + x[2], 0);
+  const humanShare = isFantasy() ? 1 - INHUMAN_SHARE : 1;
+  const table = raw.map(([a, b, w]) => [a, b, w / total * humanShare]);
+  if(isFantasy()) table.push([111, 2000, INHUMAN_SHARE]);
+  return table;
+}
 function balancedAge(ages){
-  /* 人ならざる齢（120歳以上）はこの割合の外にいるので、数に入れない */
-  const human = ages.filter(a => a >= 5 && a <= 110);
-  const bands = AGE_PYRAMID.map(([a, b, perYear]) => [a, b, perYear * (b - a + 1)]);
-  const total = bands.reduce((s, x) => s + x[2], 0);
-  const n = human.length + 1;                            // この人を入れたあとの人数
-  const pool = bands.map(([a, b, w]) => {
-    const want = w / total * n;                          // その人数なら何人いてほしいか
-    const have = human.filter(x => x >= a && x <= b).length;
-    return [[a, b], w * Math.max(0, 1 + BALANCE_STRENGTH * (want - have))];
+  const bands = ageBands();
+  /* どの段にも入らない齢は、数えようがないので外す */
+  const pool = ages.filter(x => bands.some(([a, b]) => x >= a && x <= b));
+  const n = pool.length + 1;                             // この人を入れたあとの人数
+  const picks = bands.map(([a, b, share]) => {
+    const want = share * n;                              // その人数なら何人いてほしいか
+    const have = pool.filter(x => x >= a && x <= b).length;
+    return [[a, b], share * Math.max(0, 1 + BALANCE_STRENGTH * (want - have))];
   });
-  if(pool.every(p => p[1] <= 0)) return pyramidAge();    // 念のため
-  const [lo, hi] = wpick(pool);
+  if(picks.every(p => p[1] <= 0)) return pyramidAge();   // 念のため
+  const [lo, hi] = wpick(picks);
   return ri(lo, hi);
 }
 
@@ -922,10 +947,12 @@ function makeBonds(newAge){
 function makeConstraints(balanceAges){
   const fantasy = isFantasy();
   /* 人のかたちをした年齢は人口ピラミッドから。
-     ファンタジーのときだけ、そのうえで12%が現実ばなれした年齢になる */
-  const age = (fantasy && Math.random() < 0.12)
-    ? ri(120, 2000) + "歳"
-    : (balanceAges ? balancedAge(balanceAges) : pyramidAge()) + "歳";
+     ファンタジーのときだけ、そのうえで12%が現実ばなれした年齢になる。
+     増員では、その12%もふくめて村の年齢構成を見ながら引く（balancedAge） */
+  const age = (balanceAges
+    ? balancedAge(balanceAges)
+    : (fantasy && Math.random() < INHUMAN_SHARE ? ri(111, 2000) : pyramidAge())
+  ) + "歳";
   const seedPool = fantasy ? SEED_WORDS.concat(SEED_WORDS_FANTASY) : SEED_WORDS;
   const seeds = [];
   while(seeds.length < 3){
@@ -938,14 +965,15 @@ function makeConstraints(balanceAges){
   else if(hairLength === "short") styleOpts = [["down",6],["ponytailLow",1],["bun",1]];
   else styleOpts = [["down",5],["ponytailLow",3],["ponytailHigh",2],["bun",3],["braid",2],["twin",2]];
   const hairStyle = wpick(styleOpts);
-  const humanLike = typeof age === "string" && /^\d+歳$/.test(age) && parseInt(age) <= 119;
+  const ageN = ageNum({ age });
+  const humanLike = ageN !== null && ageN <= 110;
   return {
     hairLength, hairStyle,
     hairTexture: huePick(HAIR_TEXTURE),
     hairHue: huePick(HAIR_HUE),
     eyeHue: huePick(EYE_HUE),
     skinHue: huePick(SKIN_HUE),
-    look: !humanLike ? wpick(LOOK_INHUMAN) : (fantasy ? wpick(LOOK_FANTASY) : wpick(LOOK_REAL)),
+    look: pickLook(ageN, fantasy),
     temper: wpick(TEMPER),
     social: wpick(SOCIAL),
     age, humanLike, seeds
@@ -1884,7 +1912,7 @@ function sceneSVG(){
   if(s==="summer" && t==="night"){ for(let i=0;i<14;i++){ const x=(rnd()*W).toFixed(0),y=(190+rnd()*120).toFixed(0);
     g+=`<circle cx='${x}' cy='${y}' r='2.2' fill='#eaff9c' opacity='${(rnd()*0.6+0.4).toFixed(2)}' filter='url(#b1)'/>`; } }
 
-  // 画面ぜんたいの空気感（ヴィネット）
+  // 画面全体の空気感（ヴィネット）
   g += `<rect width='${W}' height='${H}' fill='url(#vig)'/>`;
   g += `</svg>`;
   return g;
