@@ -1129,7 +1129,7 @@ function portraitSVG(v){
   const cap =
     `<path d="M30,54 C 29,32 43,23 60,23 C 77,23 91,32 90,54 C 86,50 81,47 77,51 Q71,44 65,50 Q60,43 55,50 Q49,44 43,51 C 39,47 34,50 30,54 Z" fill="${hair}" ${S}/>`;
   const capShort =
-    `<path d="M32,55 C 32,37 45,27 60,27 C 75,27 88,37 88,55 C 83,50 78,49 74,52 Q68,47 62,51 Q60,47 58,51 Q52,47 46,52 C 42,49 37,50 32,55 Z" fill="${hair}" ${S}/>`;
+    `<path d="M34,46 C 32,34 45,27 60,27 C 75,27 88,34 86,46 C 82,43 78,43 74,44 Q67,40 60,40 Q53,40 46,44 C 42,43 38,43 34,46 Z" fill="${hair}" ${S}/>`;
   const braid = (cx, topY, seg) => {
     let o = `<ellipse cx="${cx}" cy="${topY}" rx="6.5" ry="5" fill="${hair}" ${St}/>`;
     for(let i=0;i<seg;i++){
@@ -1143,7 +1143,7 @@ function portraitSVG(v){
   const segFor = len==="veryLong"?7 : len==="long"?6 : 4;
 
   // 後ろ髪・前髪・付属を組み立てる
-  let hBack="", hFront="", hTop="", hHang="", hUnder="";
+  let hBack="", hFront="", hHang="", hUnder="";
   if(len==="bald"){
     hFront = "";
   }else if(len==="veryShort"){
@@ -1155,8 +1155,9 @@ function portraitSVG(v){
   }else{ // 結った髪
     hFront = cap;
     if(style==="bun"){
-      hTop = `<ellipse cx="60" cy="18" rx="10.5" ry="9" fill="${hair}" ${S}/>`+
-             `<path d="M53,20 Q60,15 67,20" fill="none" stroke="${hairSh}" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>`;
+      /* お団子は頭の後ろ。頭より奥に置いて、後頭部からのぞくようにする */
+      hBack = `<ellipse cx="60" cy="22" rx="11" ry="9.5" fill="${hair}" ${S}/>`+
+              `<path d="M54,18 Q60,14.5 66,18" fill="none" stroke="${hairSh}" stroke-width="1.6" stroke-linecap="round" opacity=".5"/>`;
     }else if(style==="ponytailLow"){
       hBack = `<path d="M78,60 C 95,76 95,108 84,130 C 80,112 76,84 70,66 Z" fill="${hair}" ${S}/>`+
               `<ellipse cx="79" cy="60" rx="4.5" ry="5.5" fill="${hairSh}" ${St}/>`;
@@ -1234,7 +1235,6 @@ function portraitSVG(v){
       ${freckles}
       ${beardEl}
       ${mouth}
-      ${hTop}
     </g>
   </svg>`;
 }
