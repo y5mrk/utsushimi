@@ -222,9 +222,29 @@
   .dangerBtn{background:none; border:1px solid #c8a08a; color:var(--warn); border-radius:8px; padding:6px 16px; font-size:12px;}
   /* 設定モーダルの各まとまり */
   .setSect + .setSect{ border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
-  .setH3{ font-size:13px; letter-spacing:.14em; color:var(--ink); margin-bottom:8px; }
+  .setH3{ font-size:13px; letter-spacing:.14em; color:var(--ink); margin-bottom:8px; line-height:1.6; }
   .setNote{ font-size:12px; color:var(--ink-soft); line-height:1.7; margin-bottom:10px; }
+  .setNote + .setNote{ margin-top:-6px; }   /* 説明文どうしは近づける */
   .setBtns{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .setToggle{ display:inline-flex; align-items:center; gap:9px; font-size:13px; color:var(--ink); cursor:pointer; }
+  /* チェックボックスを、そのままトグルスイッチとして描く */
+  .setToggle input{
+    appearance:none; -webkit-appearance:none; margin:0; flex:none;
+    position:relative; width:42px; height:24px; border-radius:999px;
+    background:var(--line); border:1px solid var(--line); cursor:pointer;
+    transition:background .22s ease, border-color .22s ease;
+  }
+  .setToggle input::after{
+    content:""; position:absolute; top:2px; left:2px; width:18px; height:18px;
+    border-radius:50%; background:var(--card); box-shadow:0 1px 2px rgba(0,0,0,.18);
+    transition:transform .22s ease;
+  }
+  .setToggle input:checked{ background:var(--accent); border-color:var(--accent); }
+  .setToggle input:checked::after{ transform:translateX(18px); }
+  .setToggle input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .setToggle input:disabled{ opacity:.5; cursor:default; }
+  #setup .setToggle{ justify-content:center; margin-bottom:6px; }
+  #setup .toggleNote{ font-size:11.5px; color:var(--ink-soft); line-height:1.7; margin-bottom:22px; }
 
   /* ============================================================
      洗練トーンの仕上げ（季節テーマの移り変わりつき）
@@ -358,6 +378,9 @@
     <p>だれが来るかは、あなたにも、わたしにも、決められません。名前も、性格も、過去も、一度あたえられたら二度と変更はできません。あなたはその人たちのそばに立って、起こることや感情や人間関係を想像し、物語として描きとめてください。</p>
     <p>村人は一週間にひとりずつ、ふらりと増えていきます。彼らはあなたの物語を読んで、けれどあなたの物語の続きとしてではなく、やってきます。</p>
   </div>
+
+  <label class="setToggle"><input type="checkbox" id="fantasySetup" checked><span>ファンタジー要素を含める</span></label>
+  <p class="toggleNote">オンにすると、現実ばなれしたファンタジーな設定も含みます。</p>
 
   <button class="primary" id="startBtn">村をひらく</button>
 </div>
@@ -495,6 +518,14 @@
     <h2 style="font-size:18px; letter-spacing:.2em; margin-bottom:18px;">設定</h2>
 
     <div class="setSect">
+      <h3 class="setH3">
+        <label class="setToggle"><input type="checkbox" id="fantasyToggle"><span>ファンタジー要素</span></label>
+      </h3>
+      <p class="setNote">オンのとき、現実ばなれしたファンタジーな設定も許容します。</p>
+      <p class="setNote">※ この設定は、これからやってくる村人にだけはたらきます。すでに村にいる人たちは変わりません。</p>
+    </div>
+
+    <div class="setSect">
       <h3 class="setH3">データの持ち出しと読み込み</h3>
       <p class="setNote">村・物語・立ち絵をふくむすべてのデータを、ひとつのファイルに書き出せます。別のブラウザや端末で読み込めば、同じ村をそのまま続けられます。</p>
       <div class="setBtns">
@@ -502,7 +533,7 @@
         <input type="file" id="importFile" accept="application/json,.json" style="display:none">
         <button class="miniBtn" id="importBtn">データを読み込む</button>
       </div>
-      <p class="setNote">※ 読み込むと、いまブラウザにある村と物語は上書きされます。心配なときは、先に書き出しておいてください。</p>
+      <p class="setNote">※ 読み込むと、いまブラウザにある村と物語は上書きされます。</p>
     </div>
 
     <div class="setSect">
@@ -543,6 +574,7 @@ function load(){
     state.mode = "api";
     state.portraits = state.portraits || {};
     state.bulletinLog = state.bulletinLog || [];
+    state.fantasy = state.fantasy !== false;   // 旧データは「ファンタジーあり」として扱う
     state.bulletinLog.sort((a,b) => a.date.localeCompare(b.date));
   }
 }
@@ -567,22 +599,83 @@ function wpick(pairs){
 const HAIR_LEN = [["bald",1],["veryShort",3],["short",5],["medium",5],["long",4],["veryLong",2]];
 const HAIR_LEN_JP = {bald:"髪はほとんどない", veryShort:"とても短い", short:"短い", medium:"肩につかない程度", long:"肩を越える長さ", veryLong:"腰にとどくほど長い"};
 const HAIR_STYLE_JP = {down:"おろしている", ponytailLow:"低い位置でひとつに結んでいる", ponytailHigh:"高い位置でポニーテールに結んでいる", bun:"頭の上でお団子にまとめている", braid:"背中で三つ編みにしている", twin:"左右で二つに結んでいる"};
-const HAIR_HUE = [["黒",8],["こげ茶",8],["明るい茶",5],["亜麻色",3],["金",2],["銀",2],["白",2],["灰",2],["赤毛",2],["深い緑",1],["青",1],["すみれ色",1],["桃色",1],["苔のような色",1],["海のような色",1]];
-const EYE_HUE = [["黒",8],["こげ茶",8],["榛色",4],["灰",3],["青",3],["緑",3],["金",1.5],["すみれ色",1],["赤",1],["左右で色がちがう",1],["白銀",0.5]];
-const SKIN_HUE = [["ふつうの肌色",10],["色白",6],["日に焼けた色",6],["褐色",4],["青白い",2],["灰がかった色",1],["ほんのり緑がかった色",1],["陶器のように白い",1]];
-const SPECIAL_AGE = ["年齢不詳","数えるのをやめたらしい","生まれた年の記録が二つある","本人いわく『わかいほう』"];
-const SEED_WORDS = ["井戸","嘘","灯台","蜂","留守番","地図","塩","手紙","梯子","雨戸","汽笛","こだま","入れ歯","北風","川底","かなづち","へそくり","渡り鳥","昼寝","足あと","そろばん","真夜中","豆","古井戸","口笛","繕いもの","石垣","蜃気楼","粉","編み目","おつかい","忘れもの","満月","畑","靴ひも","湯気","くしゃみ","峠","貝殻","たき火","地下室","羅針盤","仕立て","蚕","うわさ","結び目","日時計","水たまり","屋根裏","鍵","行商","早起き","茸","写し絵","こおろぎ","粘土","橋","返事","前掛け","石臼","雪解け","名づけ","逆立ち","干し草","呼び鈴","遠眼鏡","綴じ糸","南京錠","浮き輪","休符","接ぎ木","算術","果樹","文鎮","初雪","たんこぶ","帳面","風見鶏","納屋","糸車","返却","朗読","隠し味","夜番","伝言","背くらべ","空き瓶","うたた寝"];
+/* 3番目の要素が 1 のものは「ファンタジーがオン」ときだけ選ばれる */
+const HAIR_HUE = [["黒", 4.5], ["濡れ羽色", 2], ["こげ茶", 4.5], ["明るい茶", 4.5], ["栗色", 3.5], ["赤茶", 2.5], ["亜麻色", 3], ["砂色", 2], ["金", 2], ["蜂蜜色", 2], ["くすんだ金", 1.5], ["プラチナブロンド", 1.2], ["銀", 2], ["白", 2], ["白髪まじり", 2], ["灰", 2], ["青みがかった灰", 1.2], ["赤毛", 2], ["赤銅色", 1.2], ["黒に近い焦げ茶", 2], ["深い緑", 1, 1], ["若草色", 0.8, 1], ["苔のような色", 1, 1], ["青", 1, 1], ["水色", 0.8, 1], ["藍", 0.8, 1], ["海のような色", 1, 1], ["すみれ色", 1, 1], ["薄紫", 0.8, 1], ["灰紫", 0.8, 1], ["桃色", 1, 1], ["珊瑚色", 0.8, 1], ["葡萄色", 0.8, 1], ["血のような赤", 0.7, 1], ["夕焼けのような橙", 0.8, 1], ["雪のような白銀", 0.8, 1], ["光の加減で虹がさす黒", 0.5, 1]];
+const EYE_HUE = [["黒", 7], ["こげ茶", 7], ["明るい茶", 2.5], ["榛色", 4], ["琥珀", 2.5], ["金", 1.5], ["灰", 3], ["青みの強い灰", 1.2], ["青", 3], ["濃い藍", 1.5], ["緑", 3], ["灰緑", 1.5], ["茶に金の斑が散る", 1], ["左右で色がちがう", 1], ["すみれ色", 1, 1], ["深い紫紺", 0.8, 1], ["赤", 1, 1], ["桜色", 0.8, 1], ["白銀", 0.5, 1], ["金と銀がまじる", 0.6, 1], ["苔色", 0.8, 1], ["夕焼けのような橙", 0.8, 1], ["瞳孔が縦に長い金", 0.6, 1], ["透きとおって色がない", 0.5, 1], ["見る角度で七色にゆらぐ", 0.4, 1]];
+const SKIN_HUE = [["うすだいだい", 10], ["色白", 6], ["赤みのある白", 2], ["黄みをおびた色", 1.5], ["日に焼けた色", 6], ["小麦色", 4], ["褐色", 4], ["濃い褐色", 2.5], ["オリーブがかった肌", 2], ["黒に近い褐色", 3], ["漆黒のように黒い肌", 2.5], ["そばかすの散った肌", 2], ["青白い", 2], ["陶器のように白い", 1], ["灰がかった色", 1, 1], ["灰白", 0.8, 1], ["月光のように青みがかった白", 1, 1], ["透けるように薄い肌", 0.6, 1]];
+/* ひととなり：性格の芯。明るい側・気むずかしい側の両方から引く */
+const TEMPER = [
+  /* 明るい・あたたかい側 */
+  ["やさしい", 4], ["明るい", 4], ["ほがらかでよく笑う", 3], ["さわやかで気持ちのよい", 3], ["楽しげでひょうきん", 3],
+  ["おおらか", 3], ["まっすぐで素直", 3], ["まじめで律儀", 3], ["のんきでマイペース", 3], ["情にあつい", 2.5],
+  ["世話焼き", 2.5], ["おっとりしている", 2.5], ["親切で気前がよい", 2.5], ["竹を割ったようなさっぱりした気性", 2.5],
+  ["楽天的で、くよくよしない", 2.5], ["働き者", 2.5], ["面倒見がよい", 2.5], ["誠実で、嘘がつけない", 2.5],
+  ["好奇心のかたまり", 2.5], ["いたずら好き", 2], ["涙もろい", 2], ["勇敢で、いざというとき前に出る", 2],
+  ["器用で、たいていのことはこなす", 2], ["おだやかで、声を荒げない", 2.5],
+  /* ふつう・くせのある側 */
+  ["負けず嫌い", 2.5], ["大胆でこわいもの知らず", 2], ["せっかち", 2], ["気まぐれ", 2], ["照れ屋", 2], ["さびしがり", 2],
+  ["用心深い", 2], ["凝り性", 2], ["理屈っぽい", 2], ["夢見がち", 2], ["変わり者", 2], ["几帳面", 2], ["おおざっぱ", 2],
+  ["そそっかしい", 2], ["飽きっぽい", 2], ["淡々として、感情を表に出さない", 2], ["物知りで、つい教えたくなる", 2],
+  ["おしゃべり", 2], ["優柔不断", 1.8], ["臆病", 1.8], ["見栄っぱり", 1.8], ["噂好き", 1.8],
+  /* 難のある側 */
+  ["頑固", 2], ["皮肉屋", 2], ["気難しい", 2], ["偏屈でへそ曲がり", 2], ["意地悪なところがある", 2], ["短気", 2],
+  ["天邪鬼", 1.8], ["無愛想でぶっきらぼう", 1.8], ["口うるさい", 1.8], ["疑り深い", 1.8], ["詮索好き", 1.5],
+  ["お節介", 1.5], ["高慢なところがある", 1.5], ["冷めている", 1.5], ["だらしないが憎めない", 1.5],
+  ["けちで、ものを手放さない", 1.5], ["怠け者", 1.5], ["嫉妬深い", 1.5], ["恩着せがましい", 1.2],
+  ["抜け目がなく、計算高い", 1.2], ["強情で、あやまらない", 1.5]];
+/* 人づきあい：外にひらくか、内にこもるか */
+const SOCIAL = [
+  /* 外にひらく側 */
+  ["人なつこく、だれとでもすぐ打ちとける", 4], ["快活で、輪の中心にいることが多い", 3.5],
+  ["よく笑い、よくしゃべる", 3], ["気さくで、通りすがりにも声をかける", 3], ["初対面でも物怖じしない", 3],
+  ["人あたりがよく、広く浅くつきあう", 3], ["だれにでも分けへだてなく接する", 2.5],
+  ["誘い上手で、人を集めるのが好き", 2.5], ["聞き役にまわるが、輪のなかにはいる", 2.5],
+  ["世話好きで、困っている人を放っておけない", 2.5], ["子どもや年下によくなつかれる", 2],
+  /* 内にこもる側 */
+  ["ひとりを好むが、誘われれば応じる", 3], ["静かで、親しい相手にしか心をひらかない", 2.5],
+  ["打ち解けるまでに時間がかかる", 2.5], ["人見知りで、口数がすくない", 2],
+  ["とっつきにくいが、話しはじめると饒舌", 2], ["用事がなければ、自分から人に近づかない", 2],
+  ["群れるのを嫌う", 2], ["面とむかうのは苦手だが、書きおきや手紙では饒舌", 1.5],
+  ["相手によって、態度がずいぶん変わる", 1.5]];
+const SEED_WORDS = ["井戸", "嘘", "灯台", "蜂", "留守番", "地図", "塩", "手紙", "梯子", "雨戸", "汽笛", "こだま", "タトゥー", "北風", "川底", "かなづち", "へそくり", "渡り鳥", "昼寝", "足あと", "そろばん", "真夜中", "豆", "古井戸", "口笛", "繕いもの", "石垣", "蜃気楼", "粉", "編み目", "おつかい", "忘れもの", "満月", "畑", "靴ひも", "湯気", "くしゃみ", "峠", "貝殻", "たき火", "地下室", "羅針盤", "仕立て", "蚕", "うわさ", "結び目", "日時計", "水たまり", "屋根裏", "鍵", "行商", "早起き", "茸", "写し絵", "こおろぎ", "粘土", "橋", "返事", "前掛け", "石臼", "雪解け", "名づけ", "逆立ち", "干し草", "呼び鈴", "遠眼鏡", "綴じ糸", "南京錠", "浮き輪", "休符", "接ぎ木", "算術", "果樹", "文鎮", "初雪", "たんこぶ", "帳面", "風見鶏", "納屋", "糸車", "返却", "朗読", "隠し味", "夜番", "伝言", "背くらべ", "空き瓶", "うたた寝", "霜", "虹", "夕立", "霧", "稲光", "雹", "陽炎", "木漏れ日", "影ふみ", "潮", "巣", "苗", "落ち葉", "蝉の抜け殻", "三日月", "海鳴り", "綿毛", "蔓", "松ぼっくり", "泥", "砂時計", "包丁", "鍋", "釜", "杓子", "火ばさみ", "ほうき", "桶", "樽", "秤", "物差し", "釘", "のこぎり", "鉋", "針", "糸", "ボタン", "継ぎあて", "洗濯ばさみ", "物干し", "麻袋", "藁", "縄", "荷車", "天秤棒", "薪", "炭", "火鉢", "湯たんぽ", "行灯", "蝋燭", "マッチ", "煙突", "煤", "竈", "蒸し器", "漬物石", "味噌", "酢", "干物", "種火", "麹", "樽底", "墨", "筆", "硯", "印鑑", "帳簿", "走り書き", "落書き", "署名", "暗号", "略図", "栞", "付箋", "余白", "あくび", "しゃっくり", "寝ぐせ", "靴ずれ", "ささくれ", "かさぶた", "白髪", "歯", "爪", "手のひら", "足首", "声変わり", "いびき", "寝言", "猫背", "迷子", "家出", "仲直り", "けんか", "約束", "内緒", "告げ口", "見張り", "順番", "相談", "勘違い", "言い訳", "見送り", "出迎え", "引っ越し", "夜逃げ", "落としもの", "拾いもの", "物々交換", "値切り", "分け前", "貸し借り", "恩返し", "仕返し", "賭け", "占い", "まじない", "お守り", "厄払い", "願かけ", "供えもの", "祭り", "盆踊り", "花火", "年越し", "大掃除", "衣替え", "田植え", "稲刈り", "種まき", "水やり", "薪割り", "井戸替え", "屋根ふき", "道普請", "虫送り", "沈黙", "ためらい", "焦り", "見栄", "未練", "後悔", "勘", "癖", "間", "縁起", "予感", "錯覚", "気配", "名残", "寝不足", "二日酔い", "居留守", "ひとりごと", "雨音", "足音", "遠雷", "鐘", "笛", "太鼓", "鈴", "拍子木", "焦げたにおい", "潮のにおい", "線香", "湯あみ", "寄り道", "抜け道", "近道", "裏木戸"];
+/* 見た目の年齢。実年齢とどれだけずれて見えるか */
+const LOOK_REAL = [["年相応に見える", 7], ["年より少し若く見える", 2], ["年より少し老けて見える", 2]];
+const LOOK_FANTASY = [["年相応に見える", 6], ["実年齢より若く見える", 2.5], ["実年齢よりずっと若く、年月が止まったように見える", 1.5],
+  ["実年齢より老けて見える", 2], ["見た目からは年齢の見当がつかない", 1.5]];
+/* 人間ばなれした年齢のとき、見た目はどのあたりに落ちつくか */
+const LOOK_INHUMAN = [["ごく若い、少年少女のように見える", 2], ["若い大人のように見える", 3.5], ["壮年のように見える", 2.5],
+  ["年老いて見える", 2], ["見た目からは年齢の見当がつかない", 1.5]];
+
+/* ファンタジー要素を含むときだけ、この種も混ざる */
+const SEED_WORDS_FANTASY = ["妖精", "精霊", "竜", "人魚", "天狗", "河童", "座敷わらし", "化け猫", "狐火", "鬼火", "山の神", "泉の主", "名もなき神", "使い魔", "影法師", "幽霊", "亡霊", "生まれ変わり", "前世", "神隠し", "迷い家", "魔法", "異界の門", "鏡の向こう", "帰れない道", "湖の底の町", "雲の上の村", "地の底の川", "魔女", "まじない師", "星読み", "夢渡り", "夢喰い", "予言", "予言書", "古文書", "石碑", "ルーン", "護符", "呪符", "魔よけ", "結界", "封印", "封じられた扉", "呪い", "祝福", "願いをかなえる硬貨", "呪われた指輪", "銀の鍵", "錆びない剣", "消えない灯", "溶けない雪", "枯れない花", "無限の井戸", "薬草", "毒草", "霊薬", "万能薬", "錬金", "賢者の石", "魔法の豆", "空飛ぶ舟", "しゃべる木", "歩く石", "歌う骨", "不老", "不死", "百年の眠り", "時が止まる", "石になる", "羽が生える", "角", "尾", "鱗", "翼", "獣の言葉", "人化け", "逆さに降る雨", "二つの月", "三つめの目", "月の満ち欠けに従う", "影を売る", "名を奪われる", "鈴の音で来るもの"];
+
+/* 村全体の設定。村ができる前（最初の画面）はチェックボックスを見る */
+function isFantasy() {
+  if (state) return state.fantasy !== false;
+  const box = $("fantasySetup");
+  return box ? box.checked : true;
+}
+/* ファンタジー限定の候補をのぞいて選ぶ */
+function huePick(table) {
+  return wpick(isFantasy() ? table : table.filter(x => !x[2]));
+}
 
 function makeConstraints(){
+  const fantasy = isFantasy();
   let age;
   const r = Math.random();
-  if(r < 0.72)      age = ri(5,85) + "歳";
-  else if(r < 0.88) age = ri(86,119) + "歳";
-  else if(r < 0.96) age = ri(120, 900) + "歳";
-  else              age = SPECIAL_AGE[ri(0, SPECIAL_AGE.length-1)];
+  if (fantasy) {
+    if (r < 0.72) age = ri(5, 85) + "歳";
+    else if (r < 0.88) age = ri(86, 119) + "歳";
+    else age = ri(120, 2000) + "歳";
+  } else {
+    if (r < 0.82) age = ri(5, 85) + "歳";
+    else age = ri(86, 110) + "歳";
+  }
+  const seedPool = fantasy ? SEED_WORDS.concat(SEED_WORDS_FANTASY) : SEED_WORDS;
   const seeds = [];
   while(seeds.length < 3){
-    const w = SEED_WORDS[ri(0, SEED_WORDS.length-1)];
+    const w = seedPool[ri(0, seedPool.length - 1)];
     if(!seeds.includes(w)) seeds.push(w);
   }
   const hairLength = wpick(HAIR_LEN);
@@ -594,22 +687,26 @@ function makeConstraints(){
   const humanLike = typeof age === "string" && /^\d+歳$/.test(age) && parseInt(age) <= 119;
   return {
     hairLength, hairStyle,
-    hairHue: wpick(HAIR_HUE),
-    eyeHue: wpick(EYE_HUE),
-    skinHue: wpick(SKIN_HUE),
+    hairHue: huePick(HAIR_HUE),
+    eyeHue: huePick(EYE_HUE),
+    skinHue: huePick(SKIN_HUE),
+    look: !humanLike ? wpick(LOOK_INHUMAN) : (fantasy ? wpick(LOOK_FANTASY) : wpick(LOOK_REAL)),
+    temper: wpick(TEMPER),
+    social: wpick(SOCIAL),
     age, humanLike, seeds
   };
 }
 function constraintText(c){
-  const ageNote = c.humanLike
-    ? ""
-    : "\n  （※この年齢は人間の一般的な年齢ではありません。apparentAge には「人間でいうと何歳くらいに見えるか」を必ず具体的に書くこと。例：『人間でいうと二十代半ばに見える』）";
+  const ageNote = c.humanLike ? "" : "（人間の一般的な年齢ではない）";
   return `- 髪の長さ: ${HAIR_LEN_JP[c.hairLength]}（hairLength は "${c.hairLength}"）
 - 髪型: ${HAIR_STYLE_JP[c.hairStyle]}（hairStyle は "${c.hairStyle}"。この値をそのまま返し、外見の描写にも反映すること）
 - 髪色の系統: ${c.hairHue}
 - 瞳の色の系統: ${c.eyeHue}
 - 肌の色の系統: ${c.skinHue}
-- 年齢: ${c.age}${ageNote}
+- 実年齢: ${c.age}${ageNote}
+- 見た目の年齢: ${c.look}
+- ひととなり: ${c.temper}
+- 人づきあい: ${c.social}
 - 発想の種: 「${c.seeds.join("」「")}」`;
 }
 
@@ -627,10 +724,10 @@ const VILLAGER_SCHEMA = `{
         "skinColorName": "肌の色の呼び名", "skinColorHex": "#rrggbb",
         "hairLength": "bald|veryShort|short|medium|long|veryLong",
         "hairStyle": "down|ponytailLow|ponytailHigh|bun|braid|twin（乱数制約の値をそのまま返す）",
-        "apparentAge": "見た目年齢。実年齢が人間ばなれした値のときは『人間でいうと何歳くらいに見えるか』を必ず書く",
+        "apparentAge": "見た目の年齢。『二十代半ばに見える』のように人間としてありうる年齢の言い方で必ず書く。『人間でいうと』などの前置きはつけない",
         "otherFeatures": "そのほか外見の特徴を1〜2文で"
       },
-      "personality": "性格。エピソードを交えた散文で3〜6文",
+      "personality": "性格。冒頭でひととなりと人づきあいがわかるように書き、エピソードを交えた散文で3〜6文",
       "hobbies": "趣味趣向。散文で2〜4文",
       "past": "過去の出来事。散文で3〜6文",
       "childhood": "幼少期の家庭環境。散文で3〜6文",
@@ -639,15 +736,27 @@ const VILLAGER_SCHEMA = `{
   ]
 }`;
 
-const COMMON_RULES = `# 生成のルール
-- 現実にはありえない設定も歓迎します（乱数制約と矛盾しない範囲で）。
+function commonRules() {
+  const fantasy = isFantasy();
+  const worldRule = fantasy
+    ? "- 現実にはありえない設定も歓迎します（乱数制約と矛盾しない範囲で）。"
+    : "- この村に、人ならざる者は訪れません。村人はみな、現実にいてもおかしくない人間として描くこと（不老不死・妖精・獣人・魔法の使い手などにしないこと）。";
+  const ageRule = fantasy
+    ? "- age は乱数制約の「実年齢」をそのまま使うこと。人間ではありえない値でもよい。\n- apparentAge には、乱数制約の「見た目の年齢」に従って、何歳くらいに見えるかを具体的に書くこと。実年齢と見た目がずれる人物がいてよい（八十歳が四十代に見える、二十歳が老成して見える、など）。ずれるときは、なぜそう見えるのかが外見や気配から伝わるように otherFeatures にも反映すること。"
+    : "- age は乱数制約の「実年齢」をそのまま使うこと。人間としてありうる値のみ。\n- apparentAge には、乱数制約の「見た目の年齢」に従って、何歳くらいに見えるかを具体的に書くこと。実年齢からかけ離れた見た目にはしないこと。";
+  return `# 生成のルール
+${worldRule}
 - 名前は特定の人種・国籍に偏らせないこと。日本語風の名前ばかりにせず、さまざまな文化圏の名前をランダムに選ぶこと。名前を理由に人種を固定しないこと。日本語風でない名前のときは、その名前をカタカナで表記すること（例：「エルナ」「タヴィ」「ヨナス」）。
-- 年齢は人間ではありえない値（乱数制約で与えられた場合）でもよい。その場合、apparentAge に「人間でいうと何歳くらいに見えるか」を必ず具体的に書くこと。
+${ageRule}
+- apparentAge は「二十代半ばに見える」「六十を過ぎたくらいに見える」のように、人間としてありうる年齢の言い方だけで書くこと。「人間でいうと」「人間にたとえると」といった前置きや、人外であることをほのめかす言い回しは書かないこと。
 - hairStyle は乱数制約で与えられた値をそのまま返し、外見の描写（otherFeatures など）にも矛盾しないように反映すること。
+- personality は、はじめの1〜2文で「ひととなり」と「人づきあい」がはっきり伝わるように書き、そのあとに具体的なエピソードを続けること。性格をぼかしたり、含みをもたせて伏せたりしないこと。
+- ひととなりが明るい人・外向的な人は、そのまま明るく外向的に描くこと。だれもかれもを物静かで内省的な人物にしないこと。意地悪・偏屈・高慢といった難のある性格も、そのとおりに描いてよい（読み手に嫌われないよう和らげなくてよい）。
 - 文章のフィールドはパラメータの列挙ではなく、具体的なエピソードを含む散文で書くこと。
 - 「発想の種」の3語から連想を飛ばして性格・過去・趣味などに反映すること。ただし語そのものを不自然に多用しないこと。
 - hex色は色の呼び名と合っていること。
 - 出力は有効なJSONのみ。コードブロックや説明文をつけないこと。`;
+}
 
 function villagerSummary(){
   return state.villagers.map(v =>
@@ -681,7 +790,7 @@ ${constraintText(cs[1])}
 ## 3人目
 ${constraintText(cs[2])}
 
-${COMMON_RULES}
+${commonRules()}
 - relationships には、この3人どうしの関係を書くこと（薄い縁でもよい。「まだよく知らない」でもよい）。
 
 # 出力形式（JSONのみ）
@@ -707,7 +816,7 @@ ${novelContext()}
 # 乱数制約（必ず従うこと）
 ${constraintText(c)}
 
-${COMMON_RULES}
+${commonRules()}
 - 上の物語と「大きな矛盾」だけは避けること（死んだはずの人物の扱い、確定した事実との衝突など）。
 - ただし、物語の続きとして都合のよい人物や、物語から連想した人物を意図的に作ってはならない。人物の中身はあくまで乱数制約と発想の種から作ること。物語は「矛盾を避けるための確認」にだけ使うこと。
 - relationships には既存の村人との関係を書くこと（「まだ誰とも会っていない」「遠い噂で聞いていた」など薄い縁でよい）。
@@ -887,6 +996,12 @@ function portraitSVG(v){
 
   const S  = 'stroke="#4a3f36" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"';
   const St = 'stroke="#4a3f36" stroke-width="0.9" stroke-linejoin="round" stroke-linecap="round"';
+  /* 肌がとても濃い人は、こげ茶の線では輪郭も目鼻も沈んでしまう。
+     顔まわりだけ、肌より明るい線にして描きおこす。 */
+  const darkSkin = lum(skin) < 0.30;
+  const faceLine = darkSkin ? shade(skin, 0.30) : "#4a3f36";
+  const Sf = `stroke="${faceLine}" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"`;
+  const Stf = `stroke="${faceLine}" stroke-width="0.9" stroke-linejoin="round" stroke-linecap="round"`;
 
   // テキストからの特徴検出（あれば添える）
   const desc = (ap.otherFeatures||"") + " " + (v.personality||"");
@@ -948,29 +1063,35 @@ function portraitSVG(v){
   /* ---- 顔の部品 ---- */
   const browY = 51 + (rnd()*2-1);
   const browTilt = (rnd()*3);
+  const browCol = darkSkin ? mix(hairSh, "#f0e2d0", 0.5) : hairSh;
   const brows =
-    `<path d="M42,${(browY+ +browTilt).toFixed(1)} Q48,${(browY-2).toFixed(1)} 54,${(browY+ +browTilt*0.4).toFixed(1)}" fill="none" stroke="${hairSh}" stroke-width="1.5" stroke-linecap="round"/>`+
-    `<path d="M66,${(browY+ +browTilt*0.4).toFixed(1)} Q72,${(browY-2).toFixed(1)} 78,${(browY+ +browTilt).toFixed(1)}" fill="none" stroke="${hairSh}" stroke-width="1.5" stroke-linecap="round"/>`;
-  const eyes =
-    `<ellipse cx="47.5" cy="62" rx="3" ry="3.9" fill="${eye}"/>`+
+    `<path d="M42,${(browY + +browTilt).toFixed(1)} Q48,${(browY - 2).toFixed(1)} 54,${(browY + +browTilt * 0.4).toFixed(1)}" fill="none" stroke="${browCol}" stroke-width="1.5" stroke-linecap="round"/>` +
+    `<path d="M66,${(browY + +browTilt * 0.4).toFixed(1)} Q72,${(browY - 2).toFixed(1)} 78,${(browY + +browTilt).toFixed(1)}" fill="none" stroke="${browCol}" stroke-width="1.5" stroke-linecap="round"/>`;
+  const eyes = darkSkin
+    ? ["47.5", "72.5"].map(cx =>
+      `<ellipse cx="${cx}" cy="62" rx="3.6" ry="4.4" fill="#f2e7d8"/>` +
+      `<ellipse cx="${cx}" cy="62" rx="2.2" ry="3" fill="${eye}"/>`).join("")
+    : `<ellipse cx="47.5" cy="62" rx="3" ry="3.9" fill="${eye}"/>` +
     `<ellipse cx="72.5" cy="62" rx="3" ry="3.9" fill="${eye}"/>`;
-  const nose = `<path d="M59,64 Q57.4,69 60.6,70.2" fill="none" stroke="${skinSh}" stroke-width="1.4" stroke-linecap="round"/>`;
+  const noseCol = darkSkin ? shade(skin, 0.22) : skinSh;
+  const nose = `<path d="M59,64 Q57.4,69 60.6,70.2" fill="none" stroke="${noseCol}" stroke-width="1.4" stroke-linecap="round"/>`;
   const cheeks = "";
   // 口もと：キャラごとに、笑顔・ひかえめな笑み・無表情を出しわける
   const mo = rnd();
+  const mouthCol = darkSkin ? "#c27f6e" : "#9c5b4e";
   let mouth;
   if(!beard && mo < 0.28){          // 口をあけた笑顔
-    mouth = `<path d="M54,77 Q60,79 66,77 Q62,84 54,77 Z" fill="#9c5b4e" ${St}/>`;
+    mouth = `<path d="M54,77 Q60,79 66,77 Q62,84 54,77 Z" fill="${mouthCol}" ${Stf}/>`;
   }else if(mo < 0.62){              // ひかえめな笑み
-    mouth = `<path d="M55,78 Q60,82 65,78" fill="none" stroke="#9c5b4e" stroke-width="1.4" stroke-linecap="round"/>`;
+    mouth = `<path d="M55,78 Q60,82 65,78" fill="none" stroke="${mouthCol}" stroke-width="1.4" stroke-linecap="round"/>`;
   }else{                           // 無表情（ほぼ直線）
-    mouth = `<path d="M56,79.4 Q60,80.4 64,79.4" fill="none" stroke="#9c5b4e" stroke-width="1.4" stroke-linecap="round"/>`;
+    mouth = `<path d="M56,79.4 Q60,80.4 64,79.4" fill="none" stroke="${mouthCol}" stroke-width="1.4" stroke-linecap="round"/>`;
   }
   const freckles = freckle
-    ? `<g fill="${shade(skin,-0.16)}" opacity=".6"><circle cx="45" cy="67" r="0.9"/><circle cx="49" cy="69" r="0.9"/><circle cx="71" cy="69" r="0.9"/><circle cx="75" cy="67" r="0.9"/><circle cx="60" cy="70" r="0.8"/></g>`
+    ? `<g fill="${darkSkin ? shade(skin, 0.2) : shade(skin, -0.16)}" opacity=".6"><circle cx="45" cy="67" r="0.9"/><circle cx="49" cy="69" r="0.9"/><circle cx="71" cy="69" r="0.9"/><circle cx="75" cy="67" r="0.9"/><circle cx="60" cy="70" r="0.8"/></g>`
     : "";
   const glassesEl = glasses
-    ? `<g fill="none" stroke="#4a3f36" stroke-width="1.2"><rect x="40.5" y="57.5" width="14" height="10" rx="5"/><rect x="65.5" y="57.5" width="14" height="10" rx="5"/><path d="M54.5,61 Q60,59 65.5,61"/></g>`
+    ? `<g fill="none" stroke="${faceLine}" stroke-width="1.2"><rect x="40.5" y="57.5" width="14" height="10" rx="5"/><rect x="65.5" y="57.5" width="14" height="10" rx="5"/><path d="M54.5,61 Q60,59 65.5,61"/></g>`
     : "";
   const beardEl = beard
     ? `<path d="M39,63 Q41,90 60,93 Q79,90 81,63 Q75,80 60,82 Q45,80 39,63 Z" fill="${hair}" ${S}/>`+
@@ -986,11 +1107,11 @@ function portraitSVG(v){
       <path d="M20,150 C 18,120 30,103 46,100 Q60,114 74,100 C 90,103 102,120 100,150 Z" fill="${cloth}" ${S}/>
       ${hHang}
       ${hBack}
-      <path d="M53,88 Q60,95 67,88 L66,103 Q60,107 54,103 Z" fill="${skin}" ${St}/>
+      <path d="M53,88 Q60,95 67,88 L66,103 Q60,107 54,103 Z" fill="${skin}" ${Stf}/>
       <ellipse cx="60" cy="86" rx="11" ry="4" fill="${skinSh}" opacity=".35"/>
-      <ellipse cx="31.5" cy="64" rx="4.5" ry="6" fill="${skin}" ${St}/>
-      <ellipse cx="88.5" cy="64" rx="4.5" ry="6" fill="${skin}" ${St}/>
-      <ellipse cx="60" cy="60" rx="28.5" ry="32" fill="${skin}" ${S}/>
+      <ellipse cx="31.5" cy="64" rx="4.5" ry="6" fill="${skin}" ${Stf}/>
+      <ellipse cx="88.5" cy="64" rx="4.5" ry="6" fill="${skin}" ${Stf}/>
+      <ellipse cx="60" cy="60" rx="28.5" ry="32" fill="${skin}" ${Sf}/>
       <ellipse cx="60" cy="83" rx="13" ry="5" fill="${skinSh}" opacity=".28"/>
       ${hFront}
       ${scarfEl}
@@ -1818,7 +1939,8 @@ function announceArrival(v){
 $("startBtn").onclick = async () => {
   // 生成はすべてプロキシ経由の自動生成（APIキー不要）
   const mode = "api";
-  state = { mode, apiKey:"", villageName:null, villageDescription:"", villagers:[], novels:[], portraits:{}, createdAt:Date.now(), lastVillagerAt:Date.now() };
+  const fantasy = $("fantasySetup").checked;
+  state = { mode, apiKey: "", villageName: null, villageDescription: "", villagers: [], novels: [], portraits: {}, fantasy, createdAt: Date.now(), lastVillagerAt: Date.now() };
   $("startBtn").disabled = true;
   showLoading("村がうまれています");
   try{
@@ -1986,7 +2108,13 @@ document.querySelectorAll(".modalBack").forEach(m => m.onclick = e => {
 });
 
 $("gear").onclick = () => {
+  $("fantasyToggle").checked = isFantasy();
   openModal("settingsModal");
+};
+$("fantasyToggle").onchange = (e) => {
+  state.fantasy = e.target.checked;
+  save();
+  toast(e.target.checked ? "ファンタジー要素を含めます" : "以降はファンタジー要素を含みません");
 };
 $("resetBtn").onclick = () => {
   if(!confirm("村と、書き溜めたすべての物語が消えます。よろしいですか？")) return;
