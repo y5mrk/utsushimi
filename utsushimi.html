@@ -202,6 +202,8 @@
   .vheader svg{width:120px; height:auto; flex-shrink:0;}
   .vheader h2{font-size:23px; letter-spacing:.1em;}
   .vheader .age{font-size:13px; color:var(--ink-soft); margin-top:2px;}
+  .bond{margin-top:12px; padding-left:10px; border-left:2px solid var(--line);}
+  .bond b{display:block; font-size:12px; color:var(--ink-soft); font-weight:600; margin-bottom:3px;}
   .lockNote{font-size:11.5px; color:var(--ink-soft); border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); padding:6px 0; margin:14px 0 18px;}
   .sect h3{font-size:13px; color:var(--accent-dark); letter-spacing:.25em; margin:18px 0 4px;}
   .sect p{font-size:14px;}
@@ -470,11 +472,11 @@
     </div>
     <div id="welcomeWrap" style="display:none">
       <p>一週間がたちました。だれかが、村の入口に立っています。</p>
-      <button class="primary" id="welcomeBtn" style="margin:0 auto">迎えにいく</button>
+      <button class="primary" id="welcomeBtn" style="margin:0 auto">村のだれかを訪ねる</button>
     </div>
     <div id="inviteWrap" style="display:none">
       <p>村は満ちました。これからは、あなたが戸を叩く番です。</p>
-      <button class="primary" id="inviteBtn" style="margin:0 auto">新しい村人を招く</button>
+      <button class="primary" id="inviteBtn" style="margin:0 auto">もうひとり訪ねる</button>
     </div>
   </section>
 
@@ -560,7 +562,7 @@
     <div class="sect"><h3>すきなこと</h3><p id="vmHobbies"></p></div>
     <div class="sect"><h3>これまでのこと</h3><p id="vmPast"></p></div>
     <div class="sect"><h3>おさないころ</h3><p id="vmChildhood"></p></div>
-    <div class="sect"><h3>村のひとたちと</h3><p id="vmRelations"></p></div>
+    <div class="sect"><h3>村のひとたちと</h3><p id="vmRelations"></p><div id="vmBonds"></div></div>
   </div>
 </div>
 
@@ -600,7 +602,7 @@
         <label class="setToggle"><input type="checkbox" id="fantasyToggle"><span>ファンタジー要素</span></label>
       </h3>
       <p class="setNote">オンのとき、現実ばなれしたファンタジーな設定も許容します。</p>
-      <p class="setNote">※ この設定は、これからやってくる村人にだけはたらきます。すでに村にいる人たちは変わりません。</p>
+      <p class="setNote">※ この設定は、これから訪れる村人にだけはたらきます。すでに村にいる人たちは変わりません。</p>
     </div>
 
     <div class="setSect">
@@ -654,6 +656,7 @@ function load(){
   if(state){
     state.mode = "api";
     state.portraits = state.portraits || {};
+    state.bonds = state.bonds || [];           // 縁はあとから足した項目
     state.bulletinLog = state.bulletinLog || [];
     state.fantasy = state.fantasy !== false;   // 旧データは「ファンタジーあり」として扱う
     state.bulletinLog.sort((a,b) => a.date.localeCompare(b.date));
@@ -799,6 +802,122 @@ function balancedAge(ages){
   return ri(lo, hi);
 }
 
+/* 縁の種。3番目は許される年齢差 [下限, 上限]（上限が null なら、どれだけ離れていてもよい）、
+   4番目はふたりともこの齢以上であること。3番目4番目がどちらも null なら年齢を問わない。連れ合いや仕事仲間を子どもに割りあてないため、
+   また血のつながりの年齢差を合わせるための条件で、AIに渡す前にここで弾く。 */
+const BOND_KINDS = [
+  /* 血のつながり */
+  ["きょうだい", 1.2, [1, 15], null],
+  ["ふたご", 1.5, [0, 0], null],
+  ["親と子", 1.0, [18, 50], null],
+  ["いとこ、親戚、または遠い縁つづき", 1.5, [0, 40], null],
+  ["血はつながらないが、育てた、または育てられた", 0.8, [16, null], null],
+  ["連れ合いをとおしての身内", 0.8, [0, 30], 18],
+  /* 暮らしの近さ */
+  ["近所に住んでいる", 2.5, null, null],
+  ["毎朝おなじ時分に顔を合わせる", 2.0, null, null],
+  ["顔は知っているが、ほとんど話したことのない相手", 2.2, null, null],
+  ["会えば挨拶をするが、それだけの相手", 2.2, null, null],
+  ["名前は知っているが、顔と結びついていない相手", 1.8, null, 10],
+  /* 親しさ */
+  ["友人", 2.5, null, null],
+  ["幼なじみ", 2.0, [0, 8], null],
+  ["いまは疎遠になった、昔の友", 1.5, [0, 30], 15],
+  ["一度だけ、深く話したことがある相手", 1.5, null, 12],
+  ["ふたりだけが知っていることがある", 1.2, null, 10],
+  ["同じものを好む相手", 2.0, null, null],
+  /* 仕事と教え */
+  ["同僚、または仕事で関わりのある相手", 2.5, null, 12],
+  ["師と弟子", 1.2, [12, 60], 8],
+  ["おなじ人に教わった相手", 1.2, null, 12],
+  ["ものを売り買いする間柄", 1.8, null, 10],
+  /* 貸し借りと負い目 */
+  ["世話になった、または世話をした相手", 2.0, null, null],
+  ["命を助けられた、または助けた", 0.8, null, null],
+  ["まだ返していない借りがある", 1.2, null, 12],
+  ["因縁がある", 1.2, null, 10],
+  /* 気持ち */
+  ["連れ合い、または元の連れ合い", 1.0, [0, 15], 18],
+  ["ひそかに想いを寄せている、または想いを寄せていた相手", 1.2, null, 13],
+  ["ひそかに憧れている相手", 1.2, null, 8],
+  ["よく言い合いになる相手", 1.8, null, null],
+  ["なんとなく苦手で、避けている相手", 1.5, null, 10],
+  /* 時の重なり */
+  ["おなじ人を見送った", 1.0, null, 10]
+];
+const BOND_COUNT = [[1, 3], [2, 4], [3, 3]];   // 一度に結ぶ縁の数（1〜3人）
+
+/* その縁がふたりの齢で成り立つか。齢が読めないときは、条件のない種だけ */
+function bondFits(kind, a, b){
+  const gap = kind[2], minAge = kind[3];
+  if(!gap && !minAge) return true;
+  if(a === null || b === null) return false;
+  if(minAge && (a < minAge || b < minAge)) return false;
+  if(gap){
+    const d = Math.abs(a - b);
+    if(d < gap[0]) return false;
+    if(gap[1] !== null && d > gap[1]) return false;   // 上限が null なら、いくつ離れていてもよい
+  }
+  return true;
+}
+/* その村人がいま結んでいる縁の数 */
+function bondCountOf(v){
+  const id = pfpKey(v);
+  return (state.bonds || []).filter(b => b.a === id || b.b === id).length;
+}
+/* その村人の、ある種類の縁。kind は AI が実際に書いたものを見る
+   （引いた種から落とされていたら、それはもうその縁ではない） */
+function bondsOf(v, name){
+  const id = pfpKey(v);
+  return (state.bonds || []).filter(b =>
+    (b.a === id || b.b === id) && String(b.kind || "").indexOf(name) >= 0);
+}
+/* その村人がすでに持っている「親にあたる人」の数。齢が上のほうが親 */
+const FOSTER = "血はつながらないが、育てた、または育てられた";
+function parentCountOf(v, name){
+  const age = ageNum(v), id = pfpKey(v);
+  if(age === null) return 0;
+  return bondsOf(v, name).filter(b => {
+    const other = (state.villagers || []).find(x => pfpKey(x) === (b.a === id ? b.b : b.a));
+    const oa = other ? ageNum(other) : null;
+    return oa !== null && oa > age;
+  }).length;
+}
+/* 数にかぎりのある縁を取り締まる。親はふたりまで、ふたごはひとりまで。
+   got は、いま組み立てている途中でこの人が得たぶん */
+function bondSlotOK(kindName, newAge, v, got){
+  if(kindName === "親と子" || kindName === FOSTER){
+    const key = kindName === "親と子" ? "parents" : "raisers";  // 実の親と育ての親は別に数える
+    return ageNum(v) > newAge
+      ? got[key] < 2                       // 新しい人が子。親は2人まで
+      : parentCountOf(v, kindName) < 2;    // 相手が子。相手の親がもう2人なら結べない
+  }
+  if(kindName === "ふたご") return got.twins < 1 && bondsOf(v, "ふたご").length < 1;
+  return true;
+}
+/* 増員のときに引く縁。縁のすくない村人ほど選ばれやすくして、
+   だれとも結ばれないままの村人が出ないようにする */
+function makeBonds(newAge){
+  const vs = state.villagers || [];
+  if(!vs.length) return [];
+  const want = Math.min(vs.length, wpick(BOND_COUNT));
+  const used = new Set(), out = [], got = { parents: 0, raisers: 0, twins: 0 };
+  for(let t = 0; t < want * 8 && out.length < want; t++){
+    const kind = wpick(BOND_KINDS.map(k => [k, k[1]]));
+    const cands = vs.filter(v => !used.has(v)
+      && bondFits(kind, newAge, ageNum(v))
+      && bondSlotOK(kind[0], newAge, v, got));
+    if(!cands.length) continue;                   // 合う相手がいなければ、種を引きなおす
+    const v = wpick(cands.map(c => [c, 1 / (1 + bondCountOf(c))]));
+    used.add(v);
+    if(kind[0] === "親と子" && ageNum(v) > newAge) got.parents++;
+    if(kind[0] === FOSTER && ageNum(v) > newAge) got.raisers++;
+    if(kind[0] === "ふたご") got.twins++;
+    out.push({ v, kind: kind[0] });
+  }
+  return out;
+}
+
 /* balanceAges を渡すと、その年齢たちを見て足りない段から引く（増員のとき） */
 function makeConstraints(balanceAges){
   const fantasy = isFantasy();
@@ -850,7 +969,8 @@ function constraintText(c){
 /* =====================================================
    プロンプト組み立て
 ===================================================== */
-const VILLAGER_SCHEMA = `{
+function villagerSchema(withBonds){
+  return `{
   "villagers": [
     {
       "name": "名前（人種・国籍は自由。姓は不要。日本語風でない名前のときはカタカナで表記する）",
@@ -866,20 +986,24 @@ const VILLAGER_SCHEMA = `{
         "otherFeatures": "そのほか外見の特徴を1〜2文で"
       },
       "personality": "性格。冒頭でひととなりがわかるように書き、エピソードを交えた散文で3〜6文",
-      "sociability": "人づきあい。乱数制約の「人づきあい」をもとに、人との距離のとり方をエピソードを交えた散文で2〜4文",
+      "sociability": "人づきあい。乱数制約の「人づきあい」をもとに、人との距離のとり方や詰め方をエピソードを交えた散文で2〜4文",
       "hobbies": "趣味趣向。散文で2〜4文",
       "past": "過去の出来事。散文で3〜6文",
       "childhood": "幼少期の家庭環境。散文で3〜6文",
-      "relationships": "他の村人との関係性。散文で2〜5文"
+      "relationships": "他の村人との関係性。散文で2〜5文"${withBonds ? `,
+      "bonds": [
+        { "with": "相手の名前（「縁のある村人」に挙がっている人）", "kind": "縁の種類", "text": "ふたりのあいだにあることを、どちらか一方の側からではなく、村に起きたこととして2〜4文で" }
+      ]` : ""}
     }
   ]
 }`;
+}
 
 function commonRules() {
   const fantasy = isFantasy();
   const worldRule = fantasy
     ? "- 現実にはありえない設定も歓迎します（乱数制約と矛盾しない範囲で）。"
-    : "- この村に、人ならざる者は訪れません。村人はみな、現実にいてもおかしくない人間として描くこと（不老不死・妖精・獣人・魔法の使い手などにしないこと）。";
+    : "- この村に、人ならざる者はいません。村人はみな、現実にいてもおかしくない人間として描くこと（不老不死・妖精・獣人・魔法の使い手などにしないこと）。";
   const ageRule = fantasy
     ? "- age は乱数制約の「実年齢」をそのまま使うこと。人間ではありえない値でもよい。\n- apparentAge には、乱数制約の「見た目の年齢」に従って、何歳くらいに見えるかを具体的に書くこと。実年齢と見た目がずれる人物がいてよい（八十歳が四十代に見える、二十歳が老成して見える、など）。ずれるときは、なぜそう見えるのかが外見や気配から伝わるように otherFeatures にも反映すること。"
     : "- age は乱数制約の「実年齢」をそのまま使うこと。人間としてありうる値のみ。\n- apparentAge には、乱数制約の「見た目の年齢」に従って、何歳くらいに見えるかを具体的に書くこと。実年齢からかけ離れた見た目にはしないこと。";
@@ -920,7 +1044,8 @@ function novelContext(){
 function buildInitialPrompt(){
   const cs = [makeConstraints(), makeConstraints(), makeConstraints()];
   return `これから、時代も場所もさだかでない小さな村をひとつ作ります。まず村の名前（日本語で、ひらがな・漢字まじりの素朴なもの）と、その村の様子や空気感をあらわす短い説明（15〜30字程度、体言止め。例：「朝霧が昼まで残り、時間の流れがゆるやかな村」「湖面に星がよく映る、風の少ない村」）を決めてください。
-つぎに、その村に最初から暮らしている3人の村人を生成してください。
+この村は、あなたが作るよりも前から、ずっとそこにあったことにしてください。
+つぎに、その村に昔から暮らしている3人の村人を生成してください。
 
 # 乱数制約（3人分。各人物は対応する制約に必ず従うこと）
 ## 1人目
@@ -940,16 +1065,35 @@ ${commonRules()}
   "villagers": [ …3人分… ]
 }
 villagers の各要素の形式:
-${VILLAGER_SCHEMA}`;
+${villagerSchema(false)}`;
+}
+
+/* 縁のある村人については、確定ずみの設定を丸ごと渡す。
+   要約だけだと「ひとりっ子だった」を読まないまま、きょうだいを作ってしまう */
+function bondContext(bonds){
+  return bonds.map(({ v, kind }) =>
+`## ${v.name}（${v.age}）── 引かれた縁: ${kind}
+- ひととなり: ${v.personality || ""}
+- 人づきあい: ${v.sociability || ""}
+- すきなこと: ${v.hobbies || ""}
+- これまでのこと: ${v.past || ""}
+- おさないころ: ${v.childhood || ""}
+- 村のひとたちと: ${v.relationships || ""}`
+  ).join("\n\n");
 }
 
 function buildNewVillagerPrompt(){
   /* 増員では、すでにいる村人の年齢を見て、村の年齢構成がかたよらないようにする */
   const c = makeConstraints((state.villagers || []).map(ageNum).filter(n => n !== null));
-  return `「${state.villageName}」（${state.villageDescription||""}）という小さな村に、新しい村人がひとりやってきます。その人物を生成してください。
+  const bonds = makeBonds(ageNum(c));
+  return `「${state.villageName}」（${state.villageDescription||""}）は、ずっと前からある小さな村です。この村に暮らしている村人のうち、まだ語られていないひとりを書き起こしてください。
+その人は、よそから越してきたのではありません。村で生まれたか、もう長いこと村にいる人です。村のひとたちとは、すでにそれぞれのつきあいがあります。いま起きているのは、その人が村に来たことではなく、その人のことが語られはじめた、ということです。
 
-# いまの村人たち
+# すでに語られている村人たち
 ${villagerSummary()}
+
+# この人と縁のある村人（乱数で選ばれました。必ずこの縁で書くこと）
+${bonds.length ? bondContext(bonds) : "（まだほかにだれもいません）"}
 
 # これまでにユーザーが書いた物語
 ${novelContext()}
@@ -960,10 +1104,13 @@ ${constraintText(c)}
 ${commonRules()}
 - 上の物語と「大きな矛盾」だけは避けること（死んだはずの人物の扱い、確定した事実との衝突など）。
 - ただし、物語の続きとして都合のよい人物や、物語から連想した人物を意図的に作ってはならない。人物の中身はあくまで乱数制約と発想の種から作ること。物語は「矛盾を避けるための確認」にだけ使うこと。
-- relationships には既存の村人との関係を書くこと（「まだ誰とも会っていない」「遠い噂で聞いていた」など薄い縁でよい）。
+- relationships には、この人から見た村のひとたちとの関わりを書くこと。よそから来た人ではないので、「村に来たばかり」「まだ誰のことも知らない」「顔を知っている程度」のように、つきあいの浅さを理由にした書きかたはしないこと。長年となりに住んでいながら、ほとんど話さない相手がいるのはかまわない。
+- bonds には、「この人と縁のある村人」に挙がっている人ひとりにつき1つずつ書くこと。with には相手の名前をそのまま、kind には縁の種類、text にはふたりのあいだにあることを、どちらか一方の側からではなく、村に起きたこととして2〜4文で書くこと（この文章は相手の村人のページにも、そのまま出ます）。
+- ふたごが引かれたときは、二卵性でかまいません。乱数制約の容姿が相手と似ていなくても、そのまま似ていないふたごとして書くこと。容姿をそろえたり、「うりふたつ」と書いたりしないこと。
+- 引かれた縁は乱数で決まったものです。相手の確定ずみの設定とどうしても噛み合わないとき（「ひとりっ子だった」と書かれている人をきょうだいにする、など）だけ、同じ相手との近い縁に落としてよい（きょうだい→いとこ→幼なじみ、など）。相手の設定は絶対に書き換えないこと。落としたときは、実際に書いた縁を kind に入れること。
 
 # 出力形式（JSONのみ）
-${VILLAGER_SCHEMA}`;
+${villagerSchema(true)}`;
 }
 
 /* 「ひとづきあい」を持っていない村人のために、いまある設定から書き起こす。
@@ -1798,7 +1945,7 @@ function renderVillage(){
     b.className = "figure";
     b.style.marginBottom = Math.floor(rnd()*30) + "px";
     const isNew = (Date.now() - (v.arrivedAt||0)) < 3*24*3600*1000 && i >= 3;
-    b.innerHTML = portraitHTML(v) + `<span class="nm">${esc(v.name)}</span>` + (isNew ? `<span class="new">あたらしい村人</span>` : "");
+    b.innerHTML = portraitHTML(v) + `<span class="nm">${esc(v.name)}</span>` + (isNew ? `<span class="new">あたらしく知った人</span>` : "");
     b.onclick = () => openVillager(i);
     f.appendChild(b);
   });
@@ -1823,7 +1970,7 @@ function renderCountdown(){
   if(diff <= 0){ el.textContent = "そろそろ、だれかが来るころです。"; return; }
   const d = Math.floor(diff / (24*3600*1000));
   const h = Math.floor((diff % (24*3600*1000)) / 3600000);
-  el.textContent = `つぎの村人がやってくるまで、あと${d}日と${h}時間`;
+  el.textContent = `つぎの村人のことがわかるまで、あと${d}日と${h}時間`;
 }
 
 /* 掲示板は「村」と「物語をかく」の右側、2か所に出る。
@@ -2136,7 +2283,7 @@ function openVillager(i){
   setPfpCtl(!!customPortrait(v));
   $("vmName").textContent = v.name;
   $("vmAge").textContent = v.age + (ap.apparentAge ? `（見た目は ${ap.apparentAge}）` : "");
-  $("vmSince").textContent = v.arrivedAt ? fmtDate(v.arrivedAt) + " から村にいる" : "";
+  $("vmSince").textContent = v.arrivedAt ? fmtDate(v.arrivedAt) + " から、あなたはこの人を知っている" : "";
   const styleJP = (ap.hairStyle && ap.hairStyle !== "down") ? "・" + HAIR_STYLE_JP[ap.hairStyle] : "";
   const texJP = ap.hairTexture ? "・" + ap.hairTexture : "";
   $("vmLooks").textContent =
@@ -2150,7 +2297,22 @@ function openVillager(i){
   $("vmPast").textContent = v.past || "";
   $("vmChildhood").textContent = v.childhood || "";
   $("vmRelations").textContent = v.relationships || "";
+  renderBonds(v);
   openModal("villagerModal");
+}
+
+/* この村人にまつわる縁。同じ文が、相手の村人のページにも出る */
+function renderBonds(v){
+  const box = $("vmBonds");
+  if(!box) return;
+  const id = pfpKey(v);
+  const mine = (state.bonds || []).filter(b => b.a === id || b.b === id);
+  box.innerHTML = mine.map(b => {
+    const oid = b.a === id ? b.b : b.a;
+    const other = (state.villagers || []).find(x => pfpKey(x) === oid);
+    const nm = other ? other.name : "村のだれか";
+    return `<div class="bond"><b>${esc(nm)}${b.kind ? "　" + esc(b.kind) : ""}</b>${esc(b.text)}</div>`;
+  }).join("");
 }
 
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -2178,12 +2340,36 @@ function hideError(){ $("errBanner").style.display = "none"; }
 function acceptVillager(raw){
   const v = (raw.villagers && raw.villagers[0]) || raw.villager || raw;
   v.arrivedAt = Date.now();
+  /* 縁は村人のものではなく、村のものとして別に持つ。
+     こうすると、相手の確定ずみの文章に手を入れずに、両方のページから同じ縁が見える */
+  const bonds = Array.isArray(v.bonds) ? v.bonds : [];
+  delete v.bonds;
   Object.freeze(v.appearance); Object.freeze(v); // 変更不能に（実行中の保証）
   state.villagers.push(JSON.parse(JSON.stringify(v))); // 保存用コピー
-  return state.villagers[state.villagers.length-1];
+  const added = state.villagers[state.villagers.length-1];
+  recordBonds(added, bonds);
+  return added;
 }
 
-/* 週次チェック：APIモードは自動、手動モードは「迎えにいく」ボタンを出す */
+/* AIが書いた縁を state.bonds に写す。相手は名前で引き当て、
+   見つからないものは捨てる（いない村人との縁を作らないため）。追記だけで、消さない */
+function recordBonds(nv, list){
+  state.bonds = state.bonds || [];
+  const id = pfpKey(nv);
+  list.forEach(b => {
+    const nm = String((b && b.with) || "").trim();
+    const text = String((b && b.text) || "").trim();
+    if(!nm || !text) return;
+    const other = state.villagers.find(x => x !== nv && x.name === nm)
+               || state.villagers.find(x => x !== nv && x.name && nm.indexOf(x.name) === 0);
+    if(!other) return;
+    const oid = pfpKey(other);
+    if(state.bonds.some(x => (x.a === id && x.b === oid) || (x.a === oid && x.b === id))) return;
+    state.bonds.push({ a: id, b: oid, kind: String(b.kind || "").slice(0, 40), text: text.slice(0, 700) });
+  });
+}
+
+/* 週次チェック：APIモードは自動、手動モードは「村のだれかを訪ねる」ボタンを出す */
 async function weeklyCheck(){
   if(!state || !state.villagers.length || busy) return;
   if(state.villagers.length >= MAX_AUTO_POP){ renderCountdown(); return; }
@@ -2193,7 +2379,7 @@ async function weeklyCheck(){
 
   busy = true;
   hideError();
-  showLoading("一週間がたち、だれかが村に近づいています");
+  showLoading("一週間がたち、村のだれかのことがわかりはじめています");
   try{
     while(Date.now() - state.lastVillagerAt >= WEEK && state.villagers.length < MAX_AUTO_POP){
       const raw = await callClaude(buildNewVillagerPrompt(), 3000);
@@ -2248,7 +2434,7 @@ async function generateBulletinRange(dates){
   }
 }
 
-/* 手動モード：一週間経過後の「迎えにいく」 */
+/* 手動モード：一週間経過後の「村のだれかを訪ねる」 */
 async function welcome(){
   if(busy) return;
   busy = true;
@@ -2268,14 +2454,14 @@ async function welcome(){
   }
 }
 
-/* 25人到達後の「新しい村人を招く」 */
+/* 25人到達後の「もうひとり訪ねる」 */
 async function invite(){
   if(busy) return;
   busy = true;
   hideError();
   if(state.mode === "api") showLoading("あなたの声に、だれかが振り向きました");
   try{
-    const raw = await generate(buildNewVillagerPrompt(), 3400, validOne, "新しい村人を招く");
+    const raw = await generate(buildNewVillagerPrompt(), 3400, validOne, "村のだれかを訪ねる");
     const nv = acceptVillager(raw);
     save();
     renderAll();
@@ -2305,7 +2491,7 @@ $("startBtn").onclick = async () => {
   // 生成はすべてプロキシ経由の自動生成（APIキー不要）
   const mode = "api";
   const fantasy = $("fantasySetup").checked;
-  state = { mode, apiKey: "", villageName: null, villageDescription: "", villagers: [], novels: [], portraits: {}, fantasy, createdAt: Date.now(), lastVillagerAt: Date.now() };
+  state = { mode, apiKey: "", villageName: null, villageDescription: "", villagers: [], novels: [], portraits: {}, bonds: [], fantasy, createdAt: Date.now(), lastVillagerAt: Date.now() };
   $("startBtn").disabled = true;
   showLoading("村がうまれています");
   try{
