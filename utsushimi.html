@@ -751,18 +751,62 @@ function huePick(table) {
   return wpick(isFantasy() ? table : table.filter(x => !x[2]));
 }
 
-function makeConstraints(){
+/* 年齢の出かた。1970年の人口ピラミッドのかたちをなぞる。
+   数字は「1歳あたりのめやす（万人）」で、絶対値ではなく比だけを使う。
+   21〜23歳の山（戦後のベビーブーム）、25〜26歳のくぼみ（戦中生まれ）、
+   そして上にいくほど細くなる裾を、そのまま残してある。
+   ただし村の話し相手としては子どもが多すぎたので、5〜14歳をへらして
+   15〜24歳にまわしてある（実際の1970年より、若者が厚い）。 */
+const AGE_PYRAMID = [
+  [5, 9, 120], [10, 14, 129], [15, 19, 215],
+  [20, 20, 245], [21, 23, 280], [24, 24, 228], [25, 26, 150], [27, 29, 175],
+  [30, 34, 180], [35, 39, 178], [40, 44, 165], [45, 49, 150],
+  [50, 54, 130], [55, 59, 113], [60, 64, 95], [65, 69, 70],
+  [70, 74, 48], [75, 79, 30], [80, 84, 16], [85, 89, 7],
+  [90, 94, 2.2], [95, 99, 0.6], [100, 110, 0.12]
+];
+/* ピラミッドから1つ引く。段をえらんでから、その中は一様に */
+function pyramidAge(){
+  const [lo, hi] = wpick(AGE_PYRAMID.map(([a, b, perYear]) => [[a, b], perYear * (b - a + 1)]));
+  return ri(lo, hi);
+}
+/* 「34歳」のような文字列から数だけ取りだす。読めないものは null */
+function ageNum(v){
+  const n = parseInt(String((v && v.age) || "").replace(/[^0-9]/g, ""), 10);
+  return isNaN(n) ? null : n;
+}
+/* あとから増える村人の年齢。すでにいる人たちを見て、足りていない段を厚く引く。
+   村ぜんたいの年齢構成が、人が増えるにつれ AGE_PYRAMID の割合へ寄っていく。
+   （最初の3人は参照する相手がいないので、ふつうに pyramidAge を使う）
+
+   重みは「不足ぶん」そのものではなく、もとの比に (1 + 2×不足) を掛ける。
+   不足ぶんだけで引くと、薄い段（高齢）は目標が1人未満なので埋まったことにならず、
+   厚い段が満たされたあとに残りの当たりが集まって、お年寄りばかりになってしまう。 */
+const BALANCE_STRENGTH = 2;
+function balancedAge(ages){
+  /* 人ならざる齢（120歳以上）はこの割合の外にいるので、数に入れない */
+  const human = ages.filter(a => a >= 5 && a <= 110);
+  const bands = AGE_PYRAMID.map(([a, b, perYear]) => [a, b, perYear * (b - a + 1)]);
+  const total = bands.reduce((s, x) => s + x[2], 0);
+  const n = human.length + 1;                            // この人を入れたあとの人数
+  const pool = bands.map(([a, b, w]) => {
+    const want = w / total * n;                          // その人数なら何人いてほしいか
+    const have = human.filter(x => x >= a && x <= b).length;
+    return [[a, b], w * Math.max(0, 1 + BALANCE_STRENGTH * (want - have))];
+  });
+  if(pool.every(p => p[1] <= 0)) return pyramidAge();    // 念のため
+  const [lo, hi] = wpick(pool);
+  return ri(lo, hi);
+}
+
+/* balanceAges を渡すと、その年齢たちを見て足りない段から引く（増員のとき） */
+function makeConstraints(balanceAges){
   const fantasy = isFantasy();
-  let age;
-  const r = Math.random();
-  if (fantasy) {
-    if (r < 0.72) age = ri(5, 85) + "歳";
-    else if (r < 0.88) age = ri(86, 119) + "歳";
-    else age = ri(120, 2000) + "歳";
-  } else {
-    if (r < 0.82) age = ri(5, 85) + "歳";
-    else age = ri(86, 110) + "歳";
-  }
+  /* 人のかたちをした年齢は人口ピラミッドから。
+     ファンタジーのときだけ、そのうえで12%が現実ばなれした年齢になる */
+  const age = (fantasy && Math.random() < 0.12)
+    ? ri(120, 2000) + "歳"
+    : (balanceAges ? balancedAge(balanceAges) : pyramidAge()) + "歳";
   const seedPool = fantasy ? SEED_WORDS.concat(SEED_WORDS_FANTASY) : SEED_WORDS;
   const seeds = [];
   while(seeds.length < 3){
@@ -900,7 +944,8 @@ ${VILLAGER_SCHEMA}`;
 }
 
 function buildNewVillagerPrompt(){
-  const c = makeConstraints();
+  /* 増員では、すでにいる村人の年齢を見て、村の年齢構成がかたよらないようにする */
+  const c = makeConstraints((state.villagers || []).map(ageNum).filter(n => n !== null));
   return `「${state.villageName}」（${state.villageDescription||""}）という小さな村に、新しい村人がひとりやってきます。その人物を生成してください。
 
 # いまの村人たち
