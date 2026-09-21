@@ -180,6 +180,10 @@
   #reader .back{background:none; border:none; color:var(--accent-dark); font-size:13px; margin-bottom:16px; letter-spacing:.1em;}
   #reader h2{font-size:21px; margin-bottom:4px; letter-spacing:.05em;}
   #reader .meta{font-size:12px; color:var(--ink-soft); margin-bottom:22px;}
+  .readerCtl{ display:flex; gap:10px; margin-bottom:16px; }
+  /* 「削除する」は最初から赤字。.miniBtn があとに来るので、詳細度を上げておく */
+  #reader .readerDel{ color:var(--warn); border-color:#c8a08a; }
+  #reader .readerDel:hover{ border-color:var(--warn); background:var(--paper2); }
   #reader .body{white-space:pre-wrap; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:26px 30px; line-height:2.1;}
   .empty{color:var(--ink-soft); font-size:14px; text-align:center; padding:40px 0;}
 
@@ -259,6 +263,8 @@
   .setNote{ font-size:12px; color:var(--ink-soft); line-height:1.7; margin-bottom:10px; }
   .setNote + .setNote{ margin-top:-6px; }   /* 説明文どうしは近づける */
   .setBtns{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  /* ネイビーのテーマでは、こげた赤(--warn)が背景に沈むので明るく振る */
+  html.dark{ --warn:#e39176; }
   .setToggle{ display:inline-flex; align-items:center; gap:9px; font-size:13px; color:var(--ink); cursor:pointer; }
   /* チェックボックスを、そのままトグルスイッチとして描く */
   .setToggle input{
@@ -374,6 +380,7 @@
 
   /* 視点人物ピッカー（執筆画面） */
   .vpLabel{ font-size:12px; color:var(--ink-soft); letter-spacing:.1em; margin:2px 0 6px; }
+  .vpError{ font-size:12px; color:var(--warn); letter-spacing:.05em; margin:-2px 0 6px; }
   #viewpointPicker{ margin-bottom:16px; }
   #viewpointStrip{ display:flex; gap:8px; flex-wrap:wrap; }
   .vpBtn{ background:none; border:1px solid var(--line); border-radius:10px; padding:5px 9px 4px; text-align:center; transition:all .2s ease; }
@@ -479,6 +486,7 @@
         <input id="novelTitle" placeholder="題（なくてもよい）">
         <div id="viewpointPicker">
           <div class="vpLabel">視点人物（複数選択可）</div>
+          <div class="vpError" id="vpError" style="display:none">※ 視点人物を選んでください</div>
           <div id="viewpointStrip"></div>
         </div>
         <textarea id="novelBody" placeholder="ここに、彼らの物語を。"></textarea>
@@ -522,7 +530,10 @@
       <h2 id="readerTitle"></h2>
       <div class="meta" id="readerMeta"></div>
       <div class="tags" id="readerTags"></div>
-      <button class="miniBtn" id="readerEdit" style="margin-bottom:16px">編集する</button>
+      <div class="readerCtl">
+        <button class="miniBtn" id="readerEdit">編集する</button>
+        <button class="miniBtn readerDel" id="readerDelete">削除する</button>
+      </div>
       <div class="body" id="readerBody"></div>
     </div>
   </section>
@@ -1758,6 +1769,12 @@ function renderFaceStrip(){
 function renderAll(){ renderHeader(); renderVillage(); renderFaceStrip(); renderBulletin(); }
 
 /* 執筆画面：視点人物のトグル選択 */
+/* 視点人物の選びわすれの注意書き。選ばれたら自動で消える */
+function setVpError(show){
+  const el = $("vpError");
+  if(el) el.style.display = show ? "" : "none";
+}
+
 /* 右ペインのタブ。"villager"（村人の設定）か "board"（村の掲示板） */
 let peekTab = "villager";
 function switchPeekTab(tab){
@@ -1822,6 +1839,8 @@ function renderViewpointStrip(){
     };
     s.appendChild(b);
   });
+
+  if(selectedViewpoints.length) setVpError(false);
 
   // だれの目でもなく書くとき。村人が何人いても、いちばん最後に置く。
   const third = document.createElement("button");
@@ -1917,6 +1936,23 @@ function renderLibrary(){
     b.onclick = () => openReader(n.id);
     list.appendChild(b);
   });
+}
+
+/* 物語を消す。*/
+function deleteNovel(id){
+  const n = state.novels.find(x => x.id === id);
+  if(!n) return;
+  const title = n.title || "無題";
+  if(!confirm(`「${title}」を削除します。この操作は取り消せません。よろしいですか？`)) return;
+  state.novels = state.novels.filter(x => x.id !== id);
+  currentReaderId = null;
+  if(editingId === id){            // 編集中だったら、書きかけの状態も解く
+    editingId = null;
+    setWriteMode();
+  }
+  save();
+  renderLibrary();
+  toast(`「${title}」を消しました`);
 }
 
 /* 執筆者タグ・視点人物タグをラベル付きで表示する。
@@ -2175,6 +2211,7 @@ function switchToView(view){
 
 /* 編集中かどうかで「書きとめる」画面の見た目を切り替える */
 function setWriteMode(){
+  setVpError(false);   // 書きはじめ・編集のはじめには出しておかない
   if(editingId){
     $("saveNovelBtn").textContent = "上書き保存";
     $("writeHint").textContent = "書きだめ帳の物語を編集しています。上書きすると元の内容は置き換わります。";
@@ -2196,6 +2233,12 @@ document.querySelectorAll("nav button").forEach(b => {
 $("saveNovelBtn").onclick = () => {
   const body = $("novelBody").value.trim();
   if(!body){ toast("まだ何も書かれていません"); return; }
+  if(!selectedViewpoints.length){   // 視点はひとつ以上（人物は何人でも。三人称視点のときは、それひとつ）
+    setVpError(true);
+    $("viewpointPicker").scrollIntoView({ behavior:"smooth", block:"center" });
+    return;
+  }
+  setVpError(false);
   const title = $("novelTitle").value.trim();
   const viewpoints = selectedViewpoints.slice();
   if(editingId){
@@ -2228,6 +2271,7 @@ $("cancelEditBtn").onclick = () => {
   switchToView("libraryView");
 };
 
+$("readerDelete").onclick = () => { if(currentReaderId) deleteNovel(currentReaderId); };
 $("readerEdit").onclick = () => {
   const n = state.novels.find(x => x.id === currentReaderId);
   if(!n) return;
