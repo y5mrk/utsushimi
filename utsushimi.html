@@ -1226,12 +1226,6 @@ function portraitSVG(v){
   const brows =
     `<path d="M42,${browOut} Q48,${browMid} 54,${browIn}" fill="none" stroke="${browCol}" stroke-width="1.5" stroke-linecap="round"/>` +
     `<path d="M66,${browIn} Q72,${browMid} 78,${browOut}" fill="none" stroke="${browCol}" stroke-width="1.5" stroke-linecap="round"/>`;
-  const eyes = darkSkin
-    ? ["47.5", "72.5"].map(cx =>
-      `<ellipse cx="${cx}" cy="62" rx="3.6" ry="4.4" fill="#f2e7d8"/>` +
-      `<ellipse cx="${cx}" cy="62" rx="2.2" ry="3" fill="${eye}"/>`).join("")
-    : `<ellipse cx="47.5" cy="62" rx="3" ry="3.9" fill="${eye}"/>` +
-    `<ellipse cx="72.5" cy="62" rx="3" ry="3.9" fill="${eye}"/>`;
   const noseCol = darkSkin ? shade(skin, 0.22) : skinSh;
   const nose = `<path d="M59,64 Q57.4,69 60.6,70.2" fill="none" stroke="${noseCol}" stroke-width="1.4" stroke-linecap="round"/>`;
   const cheeks = "";
@@ -1248,11 +1242,33 @@ function portraitSVG(v){
   }
   /* 前髪の型。rnd() は既存の5つ（服・かたむき・眉2つ・口もと）より後で呼ぶこと。
      手前に足すと、すでにいる村人の顔つきまで変わってしまう。 */
-  let fringeKind = "";
-  if(useCap){
-    fringeKind = FRINGE_KEYS[Math.floor(rnd()*FRINGE_KEYS.length)];
-    hFront = capFor(fringeKind);
-  }
+  const fringeKind = FRINGE_KEYS[Math.floor(rnd()*FRINGE_KEYS.length)];
+  if(useCap) hFront = capFor(fringeKind);
+
+  /* 目もと。眉と同じ考えかたで、目じりと目がしらの高さの差が表情になる。
+     t がマイナスなら目じりが上がって「つり目」、プラスなら下がって「たれ目」。 */
+  const EYE_SHAPES = [
+    { w:3.1, h:4.0, t:0    },  // 丸め
+    { w:4.1, h:3.5, t:0    },  // アーモンド
+    { w:4.1, h:3.4, t:-1.6 },  // つり目
+    { w:4.1, h:3.4, t:1.7  },  // たれ目
+    { w:4.3, h:2.9, t:0.4  },  // 細め
+    { w:3.5, h:4.4, t:-0.7 }   // ぱっちり
+  ];
+  const es = EYE_SHAPES[Math.floor(rnd()*EYE_SHAPES.length)];
+  /* s は目じりの向き（-1=左目は左が外、+1=右目は右が外）。
+     上下のまぶたは二次ベジェ。制御点を 2h ずらすと、曲線の頂点がちょうど h になる。 */
+  const eyePath = (cx, s) => {
+    const ox = (cx + s*es.w).toFixed(1), oy = (62 + es.t).toFixed(1);
+    const ix = (cx - s*es.w).toFixed(1), iy = (62 - es.t*0.5).toFixed(1);
+    return `M${ox},${oy} Q${cx},${(62 - 2*es.h - es.t/4).toFixed(1)} ${ix},${iy}`
+         + ` Q${cx},${(62 + 2*es.h - es.t/4).toFixed(1)} ${ox},${oy} Z`;
+  };
+  const eyes = darkSkin
+    ? [[47.5,-1],[72.5,1]].map(([cx,s]) =>
+        `<path d="${eyePath(cx,s)}" fill="#f2e7d8"/>` +
+        `<ellipse cx="${cx}" cy="62" rx="${Math.min(2.3, es.w*0.58).toFixed(1)}" ry="${Math.min(3, es.h*0.8).toFixed(1)}" fill="${eye}"/>`).join("")
+    : [[47.5,-1],[72.5,1]].map(([cx,s]) => `<path d="${eyePath(cx,s)}" fill="${eye}"/>`).join("");
   /* 前髪は眉にかかる。眉を前髪より先に描いて、かぶったぶんだけ隠れるようにする。
      ただし頭巾をかぶっている人は、頭巾のすそが眉までおりてくるので眉を上に描く。 */
   const fringeHidesBrows = useCap && !scarf;
