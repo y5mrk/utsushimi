@@ -265,6 +265,9 @@
   .setNote{ font-size:12px; color:var(--ink-soft); line-height:1.7; margin-bottom:10px; }
   .setNote + .setNote{ margin-top:-6px; }   /* 説明文どうしは近づける */
   .setBtns{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .setRange{ width:100%; margin:4px 0 8px; accent-color:var(--accent); }
+  .dbgLine{ font-size:12px; color:var(--ink); line-height:1.8; margin-bottom:6px; }
+  .dbgLine b{ font-weight:600; }
   /* ネイビーのテーマでは、こげた赤(--warn)が背景に沈むので明るく振る */
   html.dark{ --warn:#e39176; }
   .setToggle{ display:inline-flex; align-items:center; gap:9px; font-size:13px; color:var(--ink); cursor:pointer; }
@@ -616,6 +619,16 @@
       <p class="setNote">※ 読み込むと、いまブラウザにある村と物語は上書きされます。</p>
     </div>
 
+    <div class="setSect" id="dbgSect">
+      <h3 class="setH3">デバッグ用機能</h3>
+      <div class="dbgLine" id="dbgRegenLabel"></div>
+      <input type="range" class="setRange" id="dbgRegenFrom" min="1" max="1" value="1">
+      <div class="dbgLine" id="dbgRegenNote"></div>
+      <div class="setBtns">
+        <button class="dangerBtn" id="dbgRegenBtn">ここから生成しなおす</button>
+      </div>
+    </div>
+
     <div class="setSect">
       <p style="font-size:12px; color:var(--ink-soft); margin-bottom:10px;">検証用：村と物語をすべて消して最初からやり直します。村人の設定の「変更」はできませんが、村ごと手放すことだけはできます。</p>
       <button class="dangerBtn" id="resetBtn">村を畳む（全データ削除）</button>
@@ -733,7 +746,7 @@ const SOCIAL = [
   ["相手によって、態度がずいぶん変わる", 1.5]];
 const SEED_WORDS = ["井戸", "嘘", "灯台", "蜂", "留守番", "地図", "塩", "手紙", "梯子", "雨戸", "汽笛", "こだま", "タトゥー", "北風", "川底", "かなづち", "へそくり", "渡り鳥", "昼寝", "足あと", "そろばん", "真夜中", "豆", "古井戸", "口笛", "繕いもの", "石垣", "蜃気楼", "粉", "編み目", "おつかい", "忘れもの", "満月", "畑", "靴ひも", "湯気", "くしゃみ", "峠", "貝殻", "たき火", "地下室", "羅針盤", "仕立て", "蚕", "うわさ", "結び目", "日時計", "水たまり", "屋根裏", "鍵", "行商", "早起き", "茸", "写し絵", "こおろぎ", "粘土", "橋", "返事", "前掛け", "石臼", "雪解け", "名づけ", "逆立ち", "干し草", "呼び鈴", "遠眼鏡", "綴じ糸", "南京錠", "浮き輪", "休符", "接ぎ木", "算術", "果樹", "文鎮", "初雪", "たんこぶ", "帳面", "風見鶏", "納屋", "糸車", "返却", "朗読", "隠し味", "夜番", "伝言", "背くらべ", "空き瓶", "うたた寝", "霜", "虹", "夕立", "霧", "稲光", "雹", "陽炎", "木漏れ日", "影ふみ", "潮", "巣", "苗", "落ち葉", "蝉の抜け殻", "三日月", "海鳴り", "綿毛", "蔓", "松ぼっくり", "泥", "砂時計", "包丁", "鍋", "釜", "杓子", "火ばさみ", "ほうき", "桶", "樽", "秤", "物差し", "釘", "のこぎり", "鉋", "針", "糸", "ボタン", "継ぎあて", "洗濯ばさみ", "物干し", "麻袋", "藁", "縄", "荷車", "天秤棒", "薪", "炭", "火鉢", "湯たんぽ", "行灯", "蝋燭", "マッチ", "煙突", "煤", "竈", "蒸し器", "漬物石", "味噌", "酢", "干物", "種火", "麹", "樽底", "墨", "筆", "硯", "印鑑", "帳簿", "走り書き", "落書き", "署名", "暗号", "略図", "栞", "付箋", "余白", "あくび", "しゃっくり", "寝ぐせ", "靴ずれ", "ささくれ", "かさぶた", "白髪", "歯", "爪", "手のひら", "足首", "声変わり", "いびき", "寝言", "猫背", "迷子", "家出", "仲直り", "けんか", "約束", "内緒", "告げ口", "見張り", "順番", "相談", "勘違い", "言い訳", "見送り", "出迎え", "引っ越し", "夜逃げ", "落としもの", "拾いもの", "物々交換", "値切り", "分け前", "貸し借り", "恩返し", "仕返し", "賭け", "占い", "まじない", "お守り", "厄払い", "願かけ", "供えもの", "祭り", "盆踊り", "花火", "年越し", "大掃除", "衣替え", "田植え", "稲刈り", "種まき", "水やり", "薪割り", "井戸替え", "屋根ふき", "道普請", "虫送り", "沈黙", "ためらい", "焦り", "見栄", "未練", "後悔", "勘", "癖", "間", "縁起", "予感", "錯覚", "気配", "名残", "寝不足", "二日酔い", "居留守", "ひとりごと", "雨音", "足音", "遠雷", "鐘", "笛", "太鼓", "鈴", "拍子木", "焦げたにおい", "潮のにおい", "線香", "湯あみ", "寄り道", "抜け道", "近道", "裏木戸"];
 /* 見た目の年齢。実年齢とどれだけずれて見えるか */
-const LOOK_REAL = [["年相応に見える", 7], ["年より少し若く見える", 2], ["年より少し老けて見える", 2]];
+const LOOK_REAL = [["年相応に見える", 7], ["年より少し若く見える", 1], ["年より少し老けて見える", 1]];
 const LOOK_FANTASY = [["実年齢より若く見える", 2.5], ["実年齢よりずっと若く、年月が止まったように見える", 1.5], ["見た目からは年齢の見当がつかない", 1.5]];
 /* 人間ばなれした年齢のとき、見た目はどのあたりに落ちつくか。
    「実年齢より若く見える」では何も言ったことにならない齢なので、
@@ -1051,6 +1064,7 @@ ${ageRule}
 }
 
 function villagerSummary(){
+  if(!state.villagers.length) return "（まだだれも語られていません）";
   return state.villagers.map(v =>
     `- ${v.name}（${v.age}）: ${String(v.personality||"").slice(0,90)}／関係: ${String(v.relationships||"").slice(0,90)}`
   ).join("\n");
@@ -1399,18 +1413,22 @@ function portraitSVG(v){
     side:   "C 87,50 83,46 79,43 C 76,40 73,38 71,41 C 66,47 58,51 48,52 C 41,53 35,52 30,54 Z",    // 七三でながす
     oneLen: "C 89.5,60 88.5,66 86.5,71 C 80,60 70,46 58,39.5 C 50,43.5 40,51 34.5,66 C 33,62 31,58 30,54 Z", // ワンレン（前髪をつくらず、分け目から顔の横へながす）
     round:  "C 89,56 88,57 87,57.5 C 85,55 83,52 82,50 C 79,49.4 76,49 74,49 C 70,44 65,42.5 61,43 C 55,43.5 48,46 42.5,50.5 C 40,51 36,51 34,51 C 33.5,53 33,56 32.8,58 C 31.5,57 30.5,56 30,54 Z", // ラウンド
-    sheer:  "C 86,52 84,49 81,46 C 73,41 47,41 39,46 C 36,49 34,51 30,54 Z",                        // シースルー
-    wave:   "C 86,50 81,47 77,51 Q71,44 65,50 Q60,43 55,50 Q49,44 43,51 C 39,47 34,50 30,54 Z"      // ふんわり
+    sheer:  "C 89.5,58 89,62 87.5,66 C 83,58 78,50 74,46 L 46,46 C 43,52 40,60 38,68 C 34,62 31,58 30,54 Z", // シースルー（額はあけて、毛束だけ垂らす）
+    zigzag: "C 88,51 85,49 82,46 L 76,52 L 70,44 L 64,52 L 58,44 L 52,52 L 46,44 L 40,52 L 36,46 C 34,49 32,51 30,54 Z" // ジグザグ
   };
   const FRINGE_KEYS = Object.keys(FRINGES);
-  /* シースルーだけは、生えぎわを高くしたうえに、すける前髪をうすく重ねる */
-  const sheerVeil =
-    `<path d="M37,45 C 45,41 75,41 83,45 C 82,51 76,54.5 60,54.5 C 44,54.5 38,51 37,45 Z" fill="${hair}" opacity=".42"/>` +
-    [[48, 53], [60, 54.5], [72, 53]].map(([x, y2], i) =>
-      `<path d="M${x},43 Q${x + (i % 2 ? 1.4 : -1.4)},${((43 + y2) / 2).toFixed(1)} ${x},${y2}" fill="none" stroke="${hair}" stroke-width="1.6" stroke-linecap="round" opacity=".75"/>`
-    ).join("");
+  const SHEER_N = 8, SHEER_TIP = 58.5, SHEER_W = 0.95;   // 本数・毛先の高さ・毛束の太さ（半分）
+  const sheerStrands =
+    [...Array(SHEER_N).keys()].map(i => {
+      const x = 47.5 + 25 * i / (SHEER_N - 1);
+      const mid = ((45 + SHEER_TIP) / 2).toFixed(1), near = (SHEER_TIP - 3).toFixed(1);
+      const w = SHEER_W, out = (w * 1.15).toFixed(2), inn = (w * 0.6).toFixed(2);
+      return `<path d="M${(x - w).toFixed(2)},45 C ${(x - out).toFixed(2)},${mid} ${(x - inn).toFixed(2)},${near} ${x.toFixed(2)},${SHEER_TIP}`
+           + ` C ${(+x + +inn).toFixed(2)},${near} ${(+x + +out).toFixed(2)},${mid} ${(x + w).toFixed(2)},45 Z"`
+           + ` fill="${hair}" stroke="#4a3f36" stroke-width="0.5" stroke-linejoin="round"/>`;
+    }).join("");
   const capFor = k =>
-    `<path d="${capOuter}${FRINGES[k]}" fill="${hair}" ${S}/>` + (k === "sheer" ? sheerVeil : "");
+    `<path d="${capOuter}${FRINGES[k]}" fill="${hair}" ${S}/>` + (k === "sheer" ? sheerStrands : "");
   const capShort =
     `<path d="M34,46 C 32,34 45,27 60,27 C 75,27 88,34 86,46 C 82,43 78,43 74,44 Q67,40 60,40 Q53,40 46,44 C 42,43 38,43 34,46 Z" fill="${hair}" ${S}/>`;
   const braid = (cx, topY, seg) => {
@@ -2385,9 +2403,11 @@ function hideError(){ $("errBanner").style.display = "none"; }
 /* =====================================================
    村人の追加処理
 ===================================================== */
-function acceptVillager(raw){
+/* arrivedAt を渡すと、その日付で迎える（生成しなおしのとき、もとの日付を保つため）。
+   縁は pfpKey（name|arrivedAt）で記録するので、日付は freeze より前に決めておくこと */
+function acceptVillager(raw, arrivedAt){
   const v = (raw.villagers && raw.villagers[0]) || raw.villager || raw;
-  v.arrivedAt = Date.now();
+  v.arrivedAt = arrivedAt || Date.now();
   /* 縁は村人のものではなく、村のものとして別に持つ。
      こうすると、相手の確定ずみの文章に手を入れずに、両方のページから同じ縁が見える */
   const bonds = Array.isArray(v.bonds) ? v.bonds : [];
@@ -2443,6 +2463,62 @@ async function weeklyCheck(){
   }finally{
     busy = false;
     hideLoading();
+  }
+}
+
+/* =====================================================
+   デバッグ：n人目以降の村人を生成しなおす
+   （村人の設定は本来不変。ここは検証用の抜け道）
+===================================================== */
+/* 何人目以降を消すと、掲示板をどの日から書きなおすことになるか */
+function regenCutDate(fromIndex){
+  const rest = (state.villagers || []).slice(fromIndex);
+  if(!rest.length) return null;
+  const first = Math.min.apply(null, rest.map(v => v.arrivedAt || Date.now()));
+  return dateKey(new Date(first));
+}
+async function debugRegenerate(fromIndex){
+  if(busy || bbBusy) return;
+  const vs = state.villagers || [];
+  const removed = vs.slice(fromIndex);
+  if(!removed.length) return;
+  busy = true;
+  hideError();
+  try{
+    /* 消す人たちの「村に来た日」は、そのまま引き継ぐ。掲示板の日付とつじつまを合わせるため */
+    const stamps = removed.map(v => v.arrivedAt || Date.now());
+    const cutDate = regenCutDate(fromIndex);
+    const removedIds = new Set(removed.map(pfpKey));
+
+    /* 立ち絵・縁・掲示板を、その人から後ろだけ落とす */
+    removed.forEach(v => { delete state.portraits[pfpKey(v)]; });
+    state.bonds = (state.bonds || []).filter(b => !removedIds.has(b.a) && !removedIds.has(b.b));
+    const killedDates = (state.bulletinLog || []).filter(b => b.date >= cutDate).map(b => b.date);
+    state.bulletinLog = (state.bulletinLog || []).filter(b => b.date < cutDate);
+    state.villagers = vs.slice(0, fromIndex);
+    save();
+    renderAll();
+
+    /* ひとりずつ引きなおす。縁も年齢の補正も、そのつど残っている村人を見る */
+    for(let i = 0; i < removed.length; i++){
+      showLoading(`${fromIndex + i + 1}人目を書きなおしています（${i + 1}／${removed.length}）`);
+      const raw = await generate(buildNewVillagerPrompt(), 3400, validOne, "村人を生成しなおす");
+      acceptVillager(raw, stamps[i]);
+      save();
+      renderAll();
+    }
+    hideLoading();
+
+    /* その人が現れた日から先の掲示板も、書きなおす */
+    if(killedDates.length) await generateBulletinRange(killedDates);
+    toast(`${removed.length}人と、掲示板${killedDates.length}日分を書きなおしました`);
+  }catch(err){
+    if(!err.isCancel) showError("生成しなおせませんでした：" + err.message);
+  }finally{
+    busy = false;
+    hideLoading();
+    save();
+    renderAll();
   }
 }
 
@@ -2723,7 +2799,43 @@ document.querySelectorAll(".modalBack").forEach(m => m.onclick = e => {
 
 $("gear").onclick = () => {
   $("fantasyToggle").checked = isFantasy();
+  syncRegenUI();
   openModal("settingsModal");
+};
+
+/* ---- デバッグ：生成しなおし ---- */
+function syncRegenUI(){
+  const n = (state && state.villagers) ? state.villagers.length : 0;
+  const sect = $("dbgSect"), slider = $("dbgRegenFrom");
+  sect.style.display = n ? "" : "none";
+  if(!n) return;
+  slider.min = 1;
+  slider.max = n;
+  slider.value = n;   // ひらくたび、いちばん害のすくない「最後のひとりだけ」に戻す
+  renderRegenLabel();
+}
+function renderRegenLabel(){
+  const n = state.villagers.length;
+  const from = Math.min(Math.max(+$("dbgRegenFrom").value, 1), n);
+  const v = state.villagers[from - 1];
+  const count = n - from + 1;
+  $("dbgRegenLabel").innerHTML =
+    `<b>${from}人目（${esc(v.name)}）</b>から、<b>${count}人</b>を生成しなおす`;
+  const cut = regenCutDate(from - 1);
+  const days = (state.bulletinLog || []).filter(b => b.date >= cut).length;
+  $("dbgRegenNote").textContent = days
+    ? `掲示板は ${fmtDateKeyJP(cut)} 以降の ${days}日分を書きなおします`
+    : `書きなおす掲示板はありません`;
+}
+$("dbgRegenFrom").oninput = renderRegenLabel;
+$("dbgRegenBtn").onclick = () => {
+  const n = state.villagers.length;
+  const from = Math.min(Math.max(+$("dbgRegenFrom").value, 1), n);
+  const count = n - from + 1;
+  const v = state.villagers[from - 1];
+  if(!confirm(`${from}人目（${v.name}）から ${count}人を消して、引きなおします。立ち絵と縁も消えます。よろしいですか？`)) return;
+  closeModal("settingsModal");
+  debugRegenerate(from - 1);
 };
 $("fantasyToggle").onchange = (e) => {
   state.fantasy = e.target.checked;
