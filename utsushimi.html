@@ -2282,6 +2282,7 @@ function renderPeek(){
     (ap.otherFeatures ? " " + ap.otherFeatures : "");
   const sect = (h3, text, id) =>
     text ? `<div class="sect"><h3>${h3}</h3><p${id ? ` id="${id}"` : ""}>${esc(text)}</p></div>` : "";
+  const peekBonds = bondsHTML(v);
   const sw = portraitSwipeHTML(v);
   box.innerHTML =
     `<div class="peekHead">${sw ? `<div class="pfpSwipeWrap">${sw}</div>` : portraitHTML(v)}<div>` +
@@ -2294,7 +2295,13 @@ function renderPeek(){
     sect("すきなこと", v.hobbies) +
     sect("これまでのこと", v.past) +
     sect("おさないころ", v.childhood) +
-    sect("村のひとたちと", v.relationships);
+    /* 「村のひとたちと」だけは、本人の文章のあとに縁をつづける。
+       文章が空でも、縁があるなら見出しごと出す */
+    ((v.relationships || peekBonds)
+      ? `<div class="sect"><h3>村のひとたちと</h3>`
+        + (v.relationships ? `<p>${esc(v.relationships)}</p>` : "")
+        + peekBonds + `</div>`
+      : "");
   if(sw) bindPfpSwipe(box.querySelector(".pfpSwipeWrap"));
   if(!v.sociability) ensureSociability(peekVillager);
 }
@@ -2516,18 +2523,20 @@ function openVillager(i){
   openModal("villagerModal");
 }
 
-/* この村人にまつわる縁。同じ文が、相手の村人のページにも出る */
-function renderBonds(v){
-  const box = $("vmBonds");
-  if(!box) return;
+/* この村人にまつわる縁。同じ文が、相手の村人のページにも出る。
+   村人モーダルと「物語をかく」の右ペイン、どちらからも使う */
+function bondsHTML(v){
   const id = pfpKey(v);
-  const mine = (state.bonds || []).filter(b => b.a === id || b.b === id);
-  box.innerHTML = mine.map(b => {
+  return (state.bonds || []).filter(b => b.a === id || b.b === id).map(b => {
     const oid = b.a === id ? b.b : b.a;
     const other = (state.villagers || []).find(x => pfpKey(x) === oid);
     const nm = other ? other.name : "村のだれか";
     return `<div class="bond"><b>${esc(nm)}${b.kind ? "　" + esc(b.kind) : ""}</b>${esc(b.text)}</div>`;
   }).join("");
+}
+function renderBonds(v){
+  const box = $("vmBonds");
+  if(box) box.innerHTML = bondsHTML(v);
 }
 
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
