@@ -315,10 +315,12 @@
   #gear:hover{ opacity:1; transform:rotate(45deg); }
 
   /* ナビ：セグメンテッドコントロール風 */
-  nav{ display:inline-flex; gap:2px; margin:22px 0 30px; padding:4px;
+  nav{ display:inline-flex; flex-wrap:wrap; justify-content:center; max-width:100%;
+    gap:2px; margin:22px 0 30px; padding:4px;
     background:var(--card); border:1px solid var(--line); border-radius:999px;
     box-shadow:0 2px 10px rgba(60,50,35,.06); }
-  nav button{ background:none; border:none; border-radius:999px; padding:8px 24px;
+  /* タブ名が途中で折り返さないように。狭い画面では、行がふえる */
+  nav button{ background:none; border:none; border-radius:999px; padding:8px 24px; white-space:nowrap;
     font-size:13.5px; letter-spacing:.14em; color:var(--ink-soft); transition:all .25s ease; }
   nav button.active{ background:var(--accent); color:#fdfbf4; box-shadow:0 3px 10px rgba(60,50,35,.16); }
   nav button:not(.active):hover{ background:rgba(0,0,0,.045); color:var(--ink); }
@@ -402,6 +404,60 @@
     display:flex; align-items:center; justify-content:center; }
   .vpThird.active .mark{ color:var(--accent); }
 
+  /* ---------- 村人との距離 ---------- */
+  #maaiLead{ font-size:13.5px; color:var(--ink-soft); text-align:center; margin-bottom:16px; line-height:1.9; }
+  #maaiField{
+    /* z-index を置いて、ここを重なりの土台にする。
+       村人の立ち絵に振った z-index が、モーダル（z-index:50）より上に出ないように。 */
+    position:relative; z-index:0; overflow:hidden; height:470px;
+    border:1px solid var(--line); border-radius:20px;
+    box-shadow:0 10px 30px rgba(60,50,35,.12);
+    background:linear-gradient(180deg, var(--paper2) 0%, var(--card) 56%, var(--card) 100%);
+  }
+  /* 奥にたまる霧。遠い人はこの中に沈んでいく */
+  #maaiField::before{
+    content:""; position:absolute; left:0; right:0; top:0; height:64%; pointer-events:none;
+    background:linear-gradient(180deg, rgba(255,255,255,.58), rgba(255,255,255,0));
+  }
+  html.dark #maaiField::before{ background:linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,0)); }
+  #maaiStage{ position:absolute; inset:0; }
+  .mFig{
+    position:absolute; width:96px; margin-left:-48px; text-align:center;
+    border:none; background:none; padding:0; cursor:pointer;
+    transition:transform .6s ease, bottom .6s ease, left .6s ease;
+  }
+  .mFig svg, .mFig .pfp{ width:72px; height:auto; display:block; margin:0 auto;
+    opacity:var(--mop,1); filter:blur(var(--mblur,0px)) drop-shadow(0 3px 5px rgba(30,35,45,.16));
+    transition:opacity .6s ease, filter .6s ease; }
+  .mFig .nm{ display:inline-block; margin-top:2px; font-size:11.5px; letter-spacing:.07em; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:9px; padding:1px 8px;
+    opacity:var(--mnm,1); transform:scale(var(--minv,1)); transform-origin:top center;
+    transition:opacity .6s ease, transform .6s ease; }
+  .mFig.on .nm{ border-color:var(--accent); }
+  /* その人のほうから語りかけてきたぶんの、ほのかな明かり */
+  .mFig .glow{ position:absolute; left:50%; top:44%; width:110px; height:110px; margin:-55px 0 0 -55px;
+    border-radius:50%; pointer-events:none; z-index:-1;
+    background:radial-gradient(circle, rgba(232,196,110,.62), rgba(232,196,110,0) 70%); }
+  .maaiNote{ font-size:11.5px; color:var(--ink-soft); text-align:center; line-height:2; margin:14px 0 0; }
+  #maaiDetail{ margin-top:20px; }
+  #maaiDetail .card{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px 20px; }
+  #maaiDetail h3{ font-size:15px; letter-spacing:.08em; margin-bottom:4px; }
+  #maaiDetail .when{ font-size:12px; color:var(--ink-soft); margin-bottom:10px; }
+  .mTold{ display:flex; align-items:center; flex-wrap:wrap; gap:4px 9px; width:100%; text-align:left;
+    background:none; border:none; border-top:1px solid var(--line);
+    padding:10px 2px; font-size:13px; color:var(--ink); cursor:pointer; }
+  .mTold:hover{ color:var(--accent-dark); }
+  .mTold .ttl{ flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mTold .by{ flex:0 0 auto; font-size:11px; color:var(--ink-soft); letter-spacing:.05em; }
+
+  /* 物語モーダル（その場で読む） */
+  #novelModal .modal{ max-width:720px; }
+  #novelModal h2{ font-size:20px; letter-spacing:.05em; margin-bottom:4px; padding-right:28px; }
+  #novelModal .meta{ font-size:12px; color:var(--ink-soft); margin-bottom:10px; }
+  #novelModal .tags{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
+  #novelModal .body{ white-space:pre-wrap; background:var(--card); border:1px solid var(--line);
+    border-radius:12px; padding:24px 26px; line-height:2.1; max-height:62vh; overflow-y:auto; }
+
   /* タグ（書きだめ帳・リーダー） */
   #tagFilterRow{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
   .tagChip{ background:var(--card); border:1px solid var(--line); border-radius:999px;
@@ -450,6 +506,7 @@
     <button data-view="villageView" class="active">村</button>
     <button data-view="writeView">物語をかく</button>
     <button data-view="libraryView">書きだめ帳</button>
+    <button data-view="maaiView">村人との距離</button>
   </nav>
 
   <div id="errBanner"><span id="errMsg"></span><button id="retryBtn">再試行</button></div>
@@ -543,6 +600,14 @@
       <div class="body" id="readerBody"></div>
     </div>
   </section>
+
+  <section id="maaiView" style="display:none">
+    <p id="maaiLead"></p>
+    <div id="maaiField"><div id="maaiStage"></div></div>
+    <p class="maaiNote">近いほど手前に、遠いほど奥に見えています。書けば近づき、書かなければ、日がたつほどゆっくり遠ざかります。<br>
+      まわりのほのかな明かりは、その人のほうから語りかけてきたぶんです。</p>
+    <div id="maaiDetail"></div>
+  </section>
 </div>
 
 <!-- ============ 村人モーダル ============ -->
@@ -592,6 +657,17 @@
     <div id="arrPortrait"></div>
     <p id="arrText"></p>
     <button class="primary" id="arrMeetBtn">会いにいく</button>
+  </div>
+</div>
+
+<!-- ============ 物語モーダル（その場で読む） ============ -->
+<div class="modalBack" id="novelModal">
+  <div class="modal">
+    <button class="close" data-close="novelModal">×</button>
+    <h2 id="nmTitle"></h2>
+    <div class="meta" id="nmMeta"></div>
+    <div class="tags" id="nmTags"></div>
+    <div class="body" id="nmBody"></div>
   </div>
 </div>
 
@@ -2402,6 +2478,119 @@ function renderTagFilterRow(){
   }
 }
 
+/* =====================================================
+   村人との距離
+   だれがよく語られ、だれがまだ語られていないかを、数ではなく遠近で見る画面。
+   ・近いほど手前・大きく・はっきり、遠いほど奥・小さく・霞む。
+   ・書けば近づき、書かなければ日がたつほど薄れる（語りの重みは MAAI_HALF で半分になる）。
+   ・書き手が近づいたぶん（you）は遠近に、村人のほうから語ってきたぶん（ai）は明かりになる。
+===================================================== */
+const MAAI_HALF = 30*24*60*60*1000;   // 語られた一話の重みが半分になるまで
+let maaiPick = -1;                    // 下に開いている村人のindex
+
+/* 一人ひとりが、どれだけ語られてきたか。数を見せるためではなく、遠近に置きかえるための目安。 */
+function narrationOf(){
+  const now = Date.now();
+  return state.villagers.map((v,i) => {
+    let you = 0, ai = 0, lastAt = 0;
+    const told = [];
+    (state.novels||[]).forEach(n => {
+      const vp = (n.viewpoints||[]).indexOf(i) >= 0;      // 視点人物として書かれた
+      const named = !!(v.name && n.body.indexOf(v.name) >= 0);  // 本文で名前を呼ばれた
+      if(!vp && !named) return;
+      const w = (vp ? 3 : 1) * Math.pow(0.5, (now - n.createdAt) / MAAI_HALF);
+      if(n.aiWritten) ai += w; else you += w;
+      if(n.createdAt > lastAt) lastAt = n.createdAt;
+      told.push({
+        id: n.id, title: n.title || "無題", at: n.createdAt,
+        author: n.author || "あなた",
+        by: vp ? "この人の視点で書かれた" : "この物語に登場"
+      });
+    });
+    told.sort((a,b) => b.at - a.at);
+    return { i, v, you, ai, lastAt, told };
+  });
+}
+
+function renderMaai(){
+  if(!state) return;
+  const list = narrationOf();
+  const maxYou = list.reduce((m,x) => Math.max(m, x.you), 0);
+  const maxAi  = list.reduce((m,x) => Math.max(m, x.ai),  0);
+  list.forEach(x => {                       // いちばん語られている人を1とした、相対のへだたり
+    x.rel  = maxYou > 0 ? Math.pow(x.you / maxYou, 0.6) : 0;
+    x.glow = maxAi  > 0 ? Math.pow(x.ai  / maxAi,  0.6) : 0;
+  });
+
+  const near = [...list].sort((a,b) => b.rel - a.rel)[0];
+  const far = list.filter(x => x.rel < .02).map(x => x.v.name);
+  $("maaiLead").textContent = (!near || near.rel <= 0)
+    ? "まだ、だれのことも語られていません。物語をひとつ書くと、その人がすこし手前に来ます。"
+    : `いま、いちばん手前にいるのは${near.v.name}。`
+      + (far.length ? `奥のほうに${far.slice(0,3).join("、")}${far.length > 3 ? "ら" : ""}が見えています。` : "");
+
+  const stage = $("maaiStage");
+  stage.innerHTML = "";
+  const placed = [];
+  [...list].sort((a,b) => b.rel - a.rel).forEach(x => {     // 手前の人から置いていく
+    const rnd = mulberry32(hashStr((x.v.name||"") + "|maai"));  // 立ち位置は名前で決まるので、毎回おなじ
+    const jit = (rnd()*2 - 1) * 12 * (1 - x.rel);              // 奥の人ほど、深さがばらつく
+    const bottom = Math.max(3, Math.min(72, 5 + (1 - x.rel)*54 + jit));
+    // 手前の人は大きいぶん場所をとる。奥は小さいが、名前は縮まないので幅はそれなりに要る
+    const gapX = 8.5 + 6*x.rel, gapY = 6 + 5*x.rel;
+    // 近くに先客がいたら、ずらす。どこも空いていなければ、いちばん余裕のある場所に立つ
+    let left = 8 + rnd()*84, best = left, bestRoom = -1;
+    for(let t = 0; t < 60; t++){
+      const cand = t === 0 ? left : 8 + rnd()*84;
+      let room = Infinity;
+      for(const p of placed){
+        room = Math.min(room, Math.max(
+          Math.abs(p.left - cand)     / Math.max(p.gapX, gapX),
+          Math.abs(p.bottom - bottom) / Math.max(p.gapY, gapY)));
+      }
+      if(room > bestRoom){ bestRoom = room; best = cand; }
+      if(room >= 1) break;                                     // だれとも重ならない場所が見つかった
+    }
+    left = best;
+    placed.push({ left, bottom, gapX, gapY });
+    const b = document.createElement("button");
+    b.className = "mFig" + (maaiPick === x.i ? " on" : "");
+    b.style.left = left.toFixed(2) + "%";
+    b.style.bottom = bottom.toFixed(2) + "%";
+    const sc = 0.5 + 0.52*x.rel;
+    b.style.transform = `scale(${sc.toFixed(3)})`;
+    b.style.setProperty("--mop",   (0.3 + 0.7*x.rel).toFixed(3));                            // 立ち絵の濃さ
+    b.style.setProperty("--mblur", x.rel > .92 ? "0px" : ((1 - x.rel)*1.5).toFixed(2)+"px"); // 遠いほど霞む
+    // 名前だけは縮めすぎない。だれが奥にいるのかは、いつでも読みとれるようにしておく
+    b.style.setProperty("--mnm",   (0.62 + 0.38*x.rel).toFixed(3));
+    b.style.setProperty("--minv",  Math.max(1, 9.6/(11.5*sc)).toFixed(3));
+    b.style.zIndex = String(10 + Math.round(x.rel*100));
+    b.innerHTML = (x.glow > .04 ? `<span class="glow" style="opacity:${(x.glow*.9).toFixed(2)}"></span>` : "")
+      + portraitHTML(x.v) + `<span class="nm">${esc(x.v.name)}</span>`;
+    b.onclick = () => { maaiPick = x.i; renderMaai(); };
+    stage.appendChild(b);
+  });
+
+  renderMaaiDetail(list);
+}
+
+/* えらんだ人が、これまでどう語られてきたか。題名を新しい順に並べるだけで、数は出さない。 */
+function renderMaaiDetail(list){
+  const host = $("maaiDetail");
+  const x = list.find(y => y.i === maaiPick);
+  if(!x){ host.innerHTML = `<div class="empty">だれかにふれると、その人がどう語られてきたかが出ます。</div>`; return; }
+  host.innerHTML = `<div class="card">
+      <h3>${esc(x.v.name)}</h3>
+      <div class="when">${x.lastAt ? "最後に語られたのは " + fmtDate(x.lastAt) : "この人のことは、まだ語られていません"}</div>
+      ${x.told.map(t => `<button class="mTold" data-id="${esc(t.id)}"><span class="ttl">${esc(t.title)}</span><span class="by">${t.by}</span><span class="tagGroupLabel">執筆者：</span><span class="tagBadge author">${esc(t.author)}</span></button>`).join("")}
+      <div style="margin-top:14px"><button class="miniBtn" id="maaiOpen">この人のことを見る</button></div>
+    </div>`;
+  host.querySelectorAll(".mTold").forEach(b => {
+    b.onclick = () => openNovelModal(b.dataset.id);
+  });
+  $("maaiOpen").onclick = () => openVillager(x.i);
+}
+
 function renderLibrary(){
   $("reader").style.display = "none";
   renderTagFilterRow();
@@ -2454,6 +2643,19 @@ function tagsHTML(n){
     html += `<span class="tagGroupLabel">視点人物：</span>` + vp.map(nm => `<span class="tagBadge">${esc(nm)}</span>`).join("");
   }
   return html;
+}
+
+function openNovelModal(id){
+  const n = state.novels.find(x => x.id === id);
+  if(!n) return;
+  $("nmTitle").textContent = n.title || "無題";
+  $("nmMeta").textContent = fmtDate(n.createdAt) + " ・ " + n.body.length + "字"
+    + (n.updatedAt ? "（" + fmtDate(n.updatedAt) + " 更新）" : "")
+    + (n.echoOfTitle ? " ・ 「" + n.echoOfTitle + "」を受けて" : "");
+  $("nmTags").innerHTML = tagsHTML(n);
+  $("nmBody").textContent = n.body;
+  $("nmBody").scrollTop = 0;
+  openModal("novelModal");
 }
 
 function openReader(id){
@@ -2866,8 +3068,9 @@ $("startBtn").onclick = async () => {
 
 function switchToView(view){
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x.dataset.view === view));
-  ["villageView","writeView","libraryView"].forEach(v => $(v).style.display = v === view ? "" : "none");
+  ["villageView","writeView","libraryView","maaiView"].forEach(v => $(v).style.display = v === view ? "" : "none");
   if(view === "libraryView") renderLibrary();
+  if(view === "maaiView") renderMaai();
   if(view === "writeView"){ renderFaceStrip(); renderViewpointStrip(); renderPeek(); }
 }
 
