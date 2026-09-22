@@ -141,7 +141,7 @@
     border:1px solid var(--line); border-radius:12px; background:var(--card); padding:14px 16px 18px;
   }
   #peekBody .sect h3{ margin:14px 0 3px; }
-  #peekBody .sect p{ font-size:13px; line-height:1.9; }
+  #peekBody .sect p, #peekBody .sect .bond{ font-size:13px; line-height:1.9; }
   .peekEmpty{ font-size:12.5px; color:var(--ink-soft); line-height:1.9; }
   .peekHead{ display:flex; align-items:flex-start; gap:10px; padding-bottom:10px; border-bottom:1px solid var(--line); }
   /* 立ち絵は縮ませない。名前や見た目年齢が何行になっても同じ大きさ（4:5） */
@@ -206,7 +206,8 @@
   .bond b{display:block; font-size:12px; color:var(--ink-soft); font-weight:600; margin-bottom:3px;}
   .lockNote{font-size:11.5px; color:var(--ink-soft); border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); padding:6px 0; margin:14px 0 18px;}
   .sect h3{font-size:13px; color:var(--accent-dark); letter-spacing:.25em; margin:18px 0 4px;}
-  .sect p{font-size:14px;}
+  /* 縁の文章は、本人の文章と同じ大きさで（body の 15px を継がせない） */
+  .sect p, .sect .bond{font-size:14px;}
 
   /* ---------- bridge（コピー&ペースト） ---------- */
   #bridgeModal .modal{max-width:680px;}
