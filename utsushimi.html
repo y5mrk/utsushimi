@@ -657,6 +657,7 @@ let curVillager = -1;       // モーダルで開いている村人のindex
 let peekVillager = -1;      // 「物語をかく」の右側に出している村人のindex
 const VP_THIRD = -1;         // 視点人物のかわりに「三人称視点」をえらんだときの印
 const VP_THIRD_JP = "三人称視点";
+const AUTHOR_AI = "AI";     // 村人の語りの執筆者タグ（だれの視点かは視点人物タグのほうに記載）
 let selectedViewpoints = []; // 執筆中に選択している視点人物（村人index、または VP_THIRD の配列）
 let activeTagFilters = [];   // 書きだめ帳の絞り込みに使う視点人物タグ（村人indexの配列）
 let activeAuthorFilters = []; // 書きだめ帳の絞り込みに使う執筆者タグ（"あなた"などの文字列の配列）
@@ -671,6 +672,8 @@ function load(){
     state.portraits = state.portraits || {};
     state.bonds = state.bonds || [];           // 縁はあとから足した項目
     state.bulletinLog = state.bulletinLog || [];
+    state.voices = state.voices || {};         // 村人ごとの一人称・口調（語りはあとから足した項目）
+    (state.novels||[]).forEach(n => { if(n.aiWritten) n.author = AUTHOR_AI; });  // 執筆者タグを村人名から「AI」へ
     state.fantasy = state.fantasy !== false;   // 旧データは「ファンタジーあり」として扱う
     state.bulletinLog.sort((a,b) => a.date.localeCompare(b.date));
   }
@@ -1198,14 +1201,15 @@ function buildSociabilityPrompt(v){
 
 function buildBulletinPrompt(targetDateJP, prevBoard){
   const prevNote = (prevBoard && prevBoard.events.length)
-    ? `\n# 前回の掲示板（参考。同じ出来事を繰り返さないこと）\n${prevBoard.events.map(e => `- ${e.time ? e.time+" " : ""}${e.text}`).join("\n")}\n`
+    ? `\n# 前の日の貼り紙（参考。同じ用件・同じ結びを繰り返さないこと）\n${prevBoard.events.map(e => `- ${e.time ? e.time+" " : ""}${e.text}`).join("\n")}\n`
     : "";
   const bonds = bondSummary();
   const bondNote = bonds ? `\n# 村人どうしの縁\n${bonds}\n` : "";
   const bondRule = bonds
-    ? "\n- 村人どうしの縁（上の一覧）をふまえた出来事を、すくなくとも1件は入れること。縁の中身をそのまま告知にせず、その縁があるからこそ起きる、その日かぎりの出来事にすること。"
+    ? "\n- 村人どうしの縁（上の一覧）をふまえた貼り紙を、すくなくとも1枚は入れること。縁の中身をそのまま書き写さず、その縁があるからこそ生まれる用件にすること。"
     : "";
-  return `「${state.villageName}」（${state.villageDescription||""}）という村で、${targetDateJP}に起きた、村の掲示板に貼り出すようなちょっとした事件やできごとを2〜4件考えてください。
+  return `「${state.villageName}」（${state.villageDescription||""}）という村の掲示板に、${targetDateJP}に貼り出された貼り紙を2〜4枚考えてください。
+書くのは村の人です。読むのも村の人です。出来事をあとから語る文章ではなく、その日、板の前に立った人に向けて書かれた知らせとして書いてください。
 
 # いまの村人たち
 ${villagerSummary()}
@@ -1215,18 +1219,122 @@ ${novelContext()}
 ${prevNote}
 # 生成のルール
 - 村人の設定やこれまでの物語と大きく矛盾しないこと（死んだはずの人物が元気に動き回る、確定した事実と衝突する、など）。
-- ただし、物語の続きやオチをつけるような出来事を作ってはならない。物語はあくまで「矛盾を避けるための確認」に使うこと。
-- 村人が関わらない、天気や動物、道具など村の空気を感じさせる些細な出来事も歓迎する。
+- ただし、物語の続きやオチをつけるような貼り紙を作ってはならない。物語はあくまで「矛盾を避けるための確認」に使うこと。
+- 村人の名が出ない貼り紙もあってよい。天気、道の様子、道具、けもののことなど、村の暮らしにまつわる用件でよい。
 - 一人の村人に偏らず、複数の村人が織り交ざるようにすること。${bondRule}
-- 内容（text）は掲示板の一文告知のように短く具体的に（1〜2文）。
+- text は貼り紙の文面。1〜2文で、短く具体的に。
+- 貼り紙には用件がある。1枚ごとに別の用件を選ぶこと。たとえば──落とし物、探しもの、目撃した知らせ、注意の呼びかけ、お願いごと、報告、問い合わせ、当番や予定の知らせ、お礼、お詫び、届けもの、拾いもの。
+- 結びは用件によって変わる。「〜を探しています」「〜までお知らせください」「〜にはお気をつけください」「〜との報告があります」「〜は不明です」「〜してくださると助かります」「〜との目撃情報あり」あたりが目安。ただし、この言い回しをそのまま写さないこと。同じ用件でも、その日その人の言いかたで書くこと。
+- 「〜だそうです」「〜のようです」「〜とのことです」のような、人づてに聞いた語り口でそろえないこと。2枚以上を同じ結びにしないこと。
+- 体言止めや、用件だけの短い書きかた（「〜、預かっています。」「〜、中止。」「〜、あすまで。」）もまぜてよい。
+- 貼り紙の主は毎回ちがってよい。だれが書いたかは名乗っても名乗らなくてもよい。
 - 時刻（time）は "HH:MM" の24時間表記。4件なら4件とも別々の時間帯に散らすこと。
 - 出力は有効なJSONのみ。コードブロックや説明文をつけないこと。
 
 # 出力形式（JSONのみ）
 {
   "events": [
-    { "time": "HH:MM", "text": "できごとの内容（1〜2文）" }
+    { "time": "HH:MM", "text": "貼り紙の文面（1〜2文）" }
   ]
+}`;
+}
+
+/* =====================================================
+   村人の語り
+   書き手が物語をひとつ書くと、その二日後に、村のだれかがその物語を
+   引き取って一話を書く。だれが語るかは抽選で、書き手には選べない。
+   一人称と口調は最初の一話で決まり、以後その人はずっとその声で語る（state.voices）。
+===================================================== */
+const ECHO_DELAY = 2*24*60*60*1000;   // 書き手が書いてから、村人が語りはじめるまで
+const ECHO_LEN   = 1000;              // 語りの目安の文字数
+
+/* 語り手を抽選する。書き手が選んだ視点人物は外し、
+   物語のなかで名前を呼ばれている人・その視点人物と縁のある人を厚く引く。 */
+function pickEchoTeller(n){
+  const used = new Set((n.viewpoints||[]).filter(i => i !== VP_THIRD));
+  const bondIds = new Set();
+  used.forEach(i => {
+    const v = state.villagers[i];
+    if(!v) return;
+    const id = pfpKey(v);
+    (state.bonds||[]).forEach(b => {
+      if(b.a === id) bondIds.add(b.b);
+      if(b.b === id) bondIds.add(b.a);
+    });
+  });
+  const pairs = [];
+  state.villagers.forEach((v,i) => {
+    if(used.has(i)) return;
+    let w = 1;
+    if(v.name && n.body.indexOf(v.name) >= 0) w = 6;   // 物語のなかで名前を呼ばれている
+    else if(bondIds.has(pfpKey(v))) w = 3;             // 視点人物と縁がある
+    pairs.push([i, w]);
+  });
+  if(!pairs.length) return -1;
+  return wpick(pairs);
+}
+
+/* その人にまつわる縁を、相手の名前つきで書き出す */
+function bondLinesOf(v){
+  const id = pfpKey(v);
+  const nameOf = x => { const o = (state.villagers||[]).find(y => pfpKey(y) === x); return o ? o.name : null; };
+  return (state.bonds||[]).map(b => {
+    if(b.a !== id && b.b !== id) return null;
+    const other = nameOf(b.a === id ? b.b : b.a);
+    if(!other) return null;
+    return `- ${other}：${b.kind || "縁がある"}${b.text ? "（" + b.text + "）" : ""}`;
+  }).filter(Boolean).join("\n");
+}
+
+function buildEchoPrompt(n, v, voice){
+  const ap = v.appearance || {};
+  const bonds = bondLinesOf(v);
+  const voiceNote = voice
+    ? `# この人の声（すでに決まっています。今回もそのまま使うこと）
+- 一人称: ${voice.first}
+- 口調: ${voice.tone || "（記載なし）"}
+出力の voice には、この二つをそのまま書き写してください。`
+    : `# この人の声（今回はじめて決めます）
+- 上の設定にふさわしい一人称（わたし／わたくし／あたし／おれ／ぼく／わし／自分／己 など、どれでもよい）と口調を、あなたが決めてください。
+- 一度決めたら、この人の語りは今後ずっとその一人称・その口調になります。一話のなかで揺らさないこと。
+- 決めたものを voice に書き出してください（口調は「ていねいで、言いさしが多い」「ぶっきらぼうに短く切る」のように20字程度で）。`;
+
+  return `「${state.villageName}」（${state.villageDescription||""}）という村があります。
+この村に暮らす ${v.name} の視点で、一人称の短い小説を一話書いてください。
+
+# もとになる物語（書き手が書いたもの。ここで起きたことは、村で本当にあったこととして扱います）
+【${n.title || "無題"}】
+${n.body}
+
+# 語り手の設定（すべて確定ずみ。書き換えたり、あたらしく足したりしてはいけません）
+- 名前: ${v.name}
+- 年齢: ${v.age}${v.apparentAge ? `（人間でいうと ${v.apparentAge}）` : ""}
+- すがた: ${ap.otherFeatures || "（記載なし）"}
+- ひととなり: ${v.personality || "（記載なし）"}
+- 人づきあい: ${v.sociability || "（記載なし）"}
+- すきなこと: ${v.hobbies || "（記載なし）"}
+- これまでのこと: ${v.past || "（記載なし）"}
+- おさないころ: ${v.childhood || "（記載なし）"}
+- 村のひとたちと: ${v.relationships || "（記載なし）"}
+${bonds ? "\n# この人の縁\n" + bonds + "\n" : ""}
+${voiceNote}
+
+# 書き方
+- ${ECHO_LEN}字程度（900〜1200字）の日本語の散文。
+- かならず ${v.name} の一人称で書くこと。地の文も会話も、決めた一人称と口調のままで通すこと。
+- もとの物語で起きたことを、この人の側から引き取って書くこと。同じ場面のかたわらでも、そのあとでも、ずっと後から思いだしている場面でもよい。
+- もとの物語の出来事を、否定したりなかったことにしたりしないこと。ただし、この人がそれをどう受けとったかは、書き手の見方と食いちがっていてよい。同じ出来事を、ちがう人が見ているだけです。
+- 物語にきれいな結末やオチをつけないこと。答えを出さず、途中で終わってよい。
+- 上の設定にないことを、この人の来歴としてあたらしく決めないこと（その日の天気や、手もとの道具のような些細なことは書いてよい）。
+- ほかの村人を出すときは、上の設定と縁の範囲で。
+- 題は、この人がつけそうな短いものを。
+- 出力は有効なJSONのみ。コードブロックや説明文をつけないこと。
+
+# 出力形式（JSONのみ）
+{
+  "title": "題（15字以内）",
+  "voice": { "first": "一人称", "tone": "口調（20字程度）" },
+  "body": "本文（${ECHO_LEN}字程度）"
 }`;
 }
 
@@ -1252,6 +1360,10 @@ function validBulletin(raw){
     if(!e || typeof e.text !== "string" || !e.text.trim())
       throw new Error("掲示板の内容が読み取れませんでした。");
   });
+}
+function validEcho(raw){
+  if(!raw || typeof raw.body !== "string" || raw.body.trim().length < 200)
+    throw new Error("語りが読み取れませんでした。");
 }
 function extractJSON(text){
   const s = text.indexOf("{"), e = text.lastIndexOf("}");
@@ -2268,7 +2380,7 @@ function renderLibrary(){
   [...novels].reverse().forEach(n => {
     const b = document.createElement("button");
     b.className = "novelItem";
-    b.innerHTML = `<div class="t">${esc(n.title || "無題")}</div><div class="meta">${fmtDate(n.createdAt)} ・ ${n.body.length}字${n.updatedAt ? " ・ 編集済み" : ""}</div><div class="tags">${tagsHTML(n)}</div>`;
+    b.innerHTML = `<div class="t">${esc(n.title || "無題")}</div><div class="meta">${fmtDate(n.createdAt)} ・ ${n.body.length}字${n.updatedAt ? " ・ 編集済み" : ""}${n.echoOfTitle ? " ・ 「" + esc(n.echoOfTitle) + "」を受けて" : ""}</div><div class="tags">${tagsHTML(n)}</div>`;
     b.onclick = () => openReader(n.id);
     list.appendChild(b);
   });
@@ -2292,7 +2404,8 @@ function deleteNovel(id){
 }
 
 /* 執筆者タグ・視点人物タグをラベル付きで表示する。
-   執筆者はユーザー保存時は常に「あなた」。将来のAI生成時は「わたし（記録係）」を想定（この画面からは変更不可）。 */
+   執筆者はユーザー保存時は「あなた」、村人の語りは「AI」。だれの声で書かれたかは視点人物タグのほうに出る。
+   どちらもこの画面からは変更不可。 */
 function tagsHTML(n){
   let html = `<span class="tagGroupLabel">執筆者：</span><span class="tagBadge author">${esc(n.author || "あなた")}</span>`;
   const vp = (n.viewpoints||[]).map(i => i === VP_THIRD ? VP_THIRD_JP : (state.villagers[i]||{}).name).filter(Boolean);
@@ -2311,7 +2424,10 @@ function openReader(id){
   $("reader").style.display = "block";
   $("readerTitle").textContent = n.title || "無題";
   $("readerMeta").textContent = fmtDate(n.createdAt) + " ・ " + n.body.length + "字"
-    + (n.updatedAt ? "（" + fmtDate(n.updatedAt) + " 更新）" : "");
+    + (n.updatedAt ? "（" + fmtDate(n.updatedAt) + " 更新）" : "")
+    + (n.echoOfTitle ? " ・ 「" + n.echoOfTitle + "」を受けて" : "");
+  // 村人の語りは書き手には手を入れられない（立ち絵とちがって、あとから変えられるものではない）
+  $("readerEdit").style.display = n.aiWritten ? "none" : "";
   $("readerTags").innerHTML = tagsHTML(n);
   $("readerBody").textContent = n.body;
 }
@@ -2558,6 +2674,56 @@ async function generateBulletinRange(dates){
   }
 }
 
+/* まだだれにも語られていない物語（書かれてから二日たったもの）を、古い順に */
+function echoPendingNovels(){
+  if(!state || !state.novels) return [];
+  const now = Date.now();
+  return state.novels.filter(n => !n.aiWritten && !n.echoAt && (now - n.createdAt) >= ECHO_DELAY);
+}
+
+let echoBusy = false;
+let echoRetryAt = 0;   // 書けなかったときは、しばらく間をおいてから
+
+async function checkEchoes(){
+  if(!state || echoBusy || busy || Date.now() < echoRetryAt) return;
+  if(!state.villagers || state.villagers.length < 2) return;
+  const pending = echoPendingNovels();
+  if(!pending.length) return;
+  const n = pending[0];                      // 一度にひとつだけ。あわてて書かせない
+  const i = pickEchoTeller(n);
+  if(i < 0){ n.echoAt = Date.now(); save(); return; }   // 語れる人がいなかった
+  const v = state.villagers[i];
+  echoBusy = true;
+  try{
+    const voice = (state.voices || {})[pfpKey(v)] || null;
+    const raw = await callClaude(buildEchoPrompt(n, v, voice), 3000);
+    validEcho(raw);
+    if(!voice && raw.voice && raw.voice.first){       // はじめて語る人の声を、ここで決めて固める
+      state.voices = state.voices || {};
+      state.voices[pfpKey(v)] = { first: String(raw.voice.first).trim(), tone: String(raw.voice.tone || "").trim() };
+    }
+    state.novels.push({
+      id: "e" + Date.now(),
+      title: String(raw.title || "").trim(),
+      body: String(raw.body).trim(),
+      viewpoints: [i],
+      author: AUTHOR_AI,
+      aiWritten: true,
+      echoOf: n.id,
+      echoOfTitle: n.title || "無題",
+      createdAt: Date.now()
+    });
+    n.echoAt = Date.now();
+    save();
+    if($("libraryView").style.display !== "none" && $("novelList").style.display !== "none") renderLibrary();
+    toast(`${v.name}が、「${n.title || "無題"}」のとなりに一話を置いていきました`);
+  }catch(err){
+    echoRetryAt = Date.now() + 30*60*1000;   // 三十分おいて、もう一度
+  }finally{
+    echoBusy = false;
+  }
+}
+
 /* 手動モード：一週間経過後の「村のだれかを訪ねる」 */
 async function welcome(){
   if(busy) return;
@@ -2615,7 +2781,7 @@ $("startBtn").onclick = async () => {
   // 生成はすべてプロキシ経由の自動生成（APIキー不要）
   const mode = "api";
   const fantasy = $("fantasySetup").checked;
-  state = { mode, apiKey: "", villageName: null, villageDescription: "", villagers: [], novels: [], portraits: {}, bonds: [], fantasy, createdAt: Date.now(), lastVillagerAt: Date.now() };
+  state = { mode, apiKey: "", villageName: null, villageDescription: "", villagers: [], novels: [], portraits: {}, bonds: [], voices: {}, fantasy, createdAt: Date.now(), lastVillagerAt: Date.now() };
   $("startBtn").disabled = true;
   showLoading("村がうまれています");
   try{
@@ -2914,6 +3080,8 @@ function enterApp(){
   setInterval(renderCountdown, 30000);
   setInterval(weeklyCheck, 60000);
   setInterval(checkBulletin, 5*60*1000);
+  setTimeout(checkEchoes, 8000);            // 掲示板と同時に投げない
+  setInterval(checkEchoes, 5*60*1000);
 }
 
 applyTheme(); // 設定画面の段階から季節の配色を反映
