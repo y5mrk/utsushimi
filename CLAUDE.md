@@ -53,7 +53,7 @@ AIがランダムに架空の村人を生成し、ユーザーがその村人た
   - `novels[]`: `{ id, title, body, viewpoints[], author, createdAt, updatedAt? }`。村人の語りはこれに `aiWritten:true` / `echoOf`（もとの物語id）/ `echoOfTitle` が付き、`author` は `AUTHOR_AI`（`"AI"`）。だれの声で書かれたかは `viewpoints` のほうに出る。書き手の物語には語りを書き終えた印として `echoAt` が付く。
   - `bonds[]`: `{ a, b, kind, text }`（a/b は `name|arrivedAt`）。村人どうしの縁。**村人の設定ではなく村のものとして持つ**ので、相手の確定ずみの文章に手を入れずに両方のページから同じ縁が見える。追記だけで、消さない。掲示板のプロンプトにも `bondSummary()` で一覧を渡す。
   - `portraits{}`: `"name|arrivedAt" → PNG dataURI`（ユーザーがアップした立ち絵）。
-  - `voices{}`: `"name|arrivedAt" → { first, tone }`。村人の**一人称と口調**。はじめて語った一話で決まり、以後変えない（設定不変の一部）。
+  - `voices{}`: `"name|arrivedAt" → { first, tone }`。村人の**一人称と口調**。書き手が物語を保存したとき、その視点人物の声を本文から読みとって入る（`ensureVoicesFromNovel`）。まだ無ければ、その人がはじめて語った一話で決まる。どちらにせよ一度入ったら変えない（設定不変の一部）。
 - `save()` / `load()` で読み書き。`load()` は旧データも `mode="api"`・`portraits={}` に補正する。
 
 ### 生成（AI呼び出し）
@@ -77,13 +77,14 @@ AIがランダムに架空の村人を生成し、ユーザーがその村人た
 - `weeklyCheck` / `welcome` / `invite` — 週次増員（最大25）と手動招待。
 - 物語: `renderLibrary` / `openReader` / 保存・上書き（`saveNovelBtn`）・編集（`readerEdit`/`cancelEditBtn`）。
 - 村人の語り: `checkEchoes`（期限の見張り・生成）/ `echoPendingNovels` / `pickEchoTeller`（語り手の抽選）/ `buildEchoPrompt` / `bondLinesOf`。
+- 声の読みとり: `ensureVoicesFromNovel` / `buildVoicePrompt` / `validVoice`。
 
 ## 機能ごとのポイント
 
 - **村人増員**: `WEEK = 7日`ごとに1人、`MAX_AUTO_POP = 25` まで自動。到達後は「新しい村人を招く」ボタン。増員のときだけ `makeConstraints(既存の年齢)` を渡し、`balancedAge` が足りていない年齢の段を厚く引く（村の年齢構成が `AGE_PYRAMID` の割合へ寄る。ファンタジー時の「120歳以上」も `INHUMAN_SHARE`=12% の段として同じ補正を受ける。最初の3人は補正なし）。
 - **立ち絵の絵柄**: 細い茶色の輪郭・丸い顔・ハイライトや頬紅なし・目は小さめ・口もとは無表情/ひかえめな笑み/口をあけた笑顔を人物ごとに出し分け。髪型 enum は `down|ponytailLow|ponytailHigh|bun|braid|twin`、長さ enum は `bald|veryShort|short|medium|long|veryLong`。前髪は `FRINGES`（ぱっつん/センターパート/七三/ワンレン/ラウンド/シースルー/ジグザグ）から、名前と年齢で決まる型をひく。眉は前髪より先に描いて、かぶったぶんを隠す（頭巾のときだけ眉が上）。`otherFeatures`/`personality` のテキストから髭・眼鏡・そばかす・スカーフを検出して描画。
 - **立ち絵の差し替え**: 村人詳細モーダルの「立ち絵を変更」。透過PNG（横400×縦500目安、4:5）を推奨。アップ画像は canvas で最大440×560に縮小しPNG dataURIで `state.portraits` に保存。「既定のイラストにもどす」で削除→SVGに戻る。保存失敗（容量超過）時はロールバックして警告。
-- **村人の語り**: 書き手が物語を保存すると、その `ECHO_DELAY = 2日` 後に、村のだれかがその物語を引き取って**一人称で1話（約1000字）**書く。物語ひとつにつき一話。語り手は `pickEchoTeller` の抽選（書き手が選んだ視点人物は除外／本文に名前が出る人=重み6・視点人物と縁のある人=3・その他=1）で、書き手には選べない。一人称と口調は最初の一話でAIが決めて `state.voices` に固め、以後は必ずそれを渡して統一する。生成は起動8秒後と5分おきに1件ずつ（`checkEchoes`）、失敗したら30分あけて再試行。語りは書きだめ帳に並び、**編集はできない**（`readerEdit` を隠す）。
+- **村人の語り**: 書き手が物語を保存すると、その `ECHO_DELAY = 2日` 後に、村のだれかがその物語を引き取って**一人称で1話（約1000字）**書く。物語ひとつにつき一話。語り手は `pickEchoTeller` の抽選（書き手が選んだ視点人物は除外／本文に名前が出る人=重み6・視点人物と縁のある人=3・その他=1）で、書き手には選べない。一人称と口調は `state.voices` に固めて以後ずっと同じ声で語らせる。**書き手が物語を保存した時点**で、その視点人物の声を本文から読みとって入れる（`ensureVoicesFromNovel`。上書き保存でも走る。失敗しても黙って次の機会にまわす）。読みとれていない人がはじめて語るときは、その一話でAIが決める。生成は起動8秒後と5分おきに1件ずつ（`checkEchoes`）、失敗したら30分あけて再試行。語りは書きだめ帳に並び、**編集はできない**（`readerEdit` を隠す）。
 - **背景（16枚）**: `SCENE_IMG` の dataURI。`<img id="villageBg">` + `object-fit:cover` で全面表示（比率ズレで端に隙間が出ない）。差し替えは `背景プロンプト16枚.md` で画像を作り直し、再エンコードして `SCENE_IMG` を更新。
 - **UIテーマ（6案）**: `THEME_PALETTES`（`beige`=01 / `sepia`=02 / `bluegrey`=04 / `pastel`=05 / `navy`=06）、`PALETTE_MAP` で `季節|時間 → パレット` を割り当て（夕=セピア, 夜=ネイビー 等）。`applyTheme` がCSS変数をセットし、`navy` のとき `<html class="dark">`。
 

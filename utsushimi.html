@@ -1338,6 +1338,34 @@ ${voiceNote}
 }`;
 }
 
+/* 書き手が書いた物語から、その視点人物の一人称と口調を読みとるための依頼文。
+   村人がはじめて自分で語るより前に、書き手が与えた声のほうを先に取る。 */
+function buildVoicePrompt(v, n){
+  const ap = v.appearance || {};
+  return `つぎの小説は、「${state.villageName}」という村に暮らす ${v.name} の視点で書かれたものです。
+この文章のなかで ${v.name} がどんな一人称を使い、どんな口調で語っているかを読みとってください。
+
+# ${v.name} の設定（参考。書き換えたり、足したりしてはいけません）
+- 年齢: ${v.age}${v.apparentAge ? `（人間でいうと ${v.apparentAge}）` : ""}
+- すがた: ${ap.otherFeatures || "（記載なし）"}
+- ひととなり: ${v.personality || "（記載なし）"}
+- 人づきあい: ${v.sociability || "（記載なし）"}
+
+# 小説
+【${n.title || "無題"}】
+${n.body}
+
+# 読みとり方
+- 一人称は、本文で ${v.name} 自身が使っているものをそのまま書き写すこと（「わたし」「おれ」「ぼく」「あたし」など）。
+- 本文に一人称が出てこないときや、三人称で書かれているときにかぎり、上の設定と本文の雰囲気にふさわしい一人称をあなたが決めてよい。
+- 口調は、語尾・話の運び・ていねいさの度合いがわかるように20字程度で（例：「ていねいで、言いさしが多い」「ぶっきらぼうに短く切る」）。
+- 読みとるだけにして、人物を評したり、あたらしい設定を足したりしないこと。
+- 出力は有効なJSONのみ。コードブロックや説明文をつけないこと。
+
+# 出力形式（JSONのみ）
+{ "voice": { "first": "一人称", "tone": "口調（20字程度）" } }`;
+}
+
 /* =====================================================
    検証
 ===================================================== */
@@ -1360,6 +1388,11 @@ function validBulletin(raw){
     if(!e || typeof e.text !== "string" || !e.text.trim())
       throw new Error("掲示板の内容が読み取れませんでした。");
   });
+}
+function validVoice(raw){
+  const vo = raw && (raw.voice || raw);
+  if(!vo || typeof vo.first !== "string" || !vo.first.trim())
+    throw new Error("一人称を読みとれませんでした。");
 }
 function validEcho(raw){
   if(!raw || typeof raw.body !== "string" || raw.body.trim().length < 200)
@@ -2681,6 +2714,24 @@ function echoPendingNovels(){
   return state.novels.filter(n => !n.aiWritten && !n.echoAt && (now - n.createdAt) >= ECHO_DELAY);
 }
 
+/* 書き手の物語の視点人物に、まだ声が決まっていなければ、本文から読みとって固める。
+   読みとれなかったときは何もしない（次の機会にやり直す）。 */
+async function ensureVoicesFromNovel(n){
+  state.voices = state.voices || {};
+  for(const i of (n.viewpoints || [])){
+    if(i === VP_THIRD) continue;
+    const v = state.villagers[i];
+    if(!v || state.voices[pfpKey(v)]) continue;
+    try{
+      const raw = await callClaude(buildVoicePrompt(v, n), 400);
+      validVoice(raw);
+      const vo = raw.voice || raw;
+      state.voices[pfpKey(v)] = { first: String(vo.first).trim(), tone: String(vo.tone || "").trim() };
+      save();
+    }catch(err){ /* 読みとれなければ、そのままにしておく */ }
+  }
+}
+
 let echoBusy = false;
 let echoRetryAt = 0;   // 書けなかったときは、しばらく間をおいてから
 
@@ -2695,6 +2746,7 @@ async function checkEchoes(){
   const v = state.villagers[i];
   echoBusy = true;
   try{
+    await ensureVoicesFromNovel(n);    // 保険。保存時に読みとれていなければ、ここで取る
     const voice = (state.voices || {})[pfpKey(v)] || null;
     const raw = await callClaude(buildEchoPrompt(n, v, voice), 3000);
     validEcho(raw);
@@ -2845,6 +2897,7 @@ $("saveNovelBtn").onclick = () => {
     const n = state.novels.find(x => x.id === editingId);
     if(n){ n.title = title; n.body = body; n.viewpoints = viewpoints; n.updatedAt = Date.now(); }
     save();
+    if(n) ensureVoicesFromNovel(n);   // 視点人物の声が決まっていなければ、本文から読みとる
     editingId = null;
     selectedViewpoints = [];
     $("novelTitle").value = ""; $("novelBody").value = "";
@@ -2853,8 +2906,10 @@ $("saveNovelBtn").onclick = () => {
     toast("上書き保存しました");
     switchToView("libraryView");
   }else{
-    state.novels.push({ id:"n"+Date.now(), title, body, viewpoints, author:"あなた", createdAt:Date.now() });
+    const n = { id:"n"+Date.now(), title, body, viewpoints, author:"あなた", createdAt:Date.now() };
+    state.novels.push(n);
     save();
+    ensureVoicesFromNovel(n);         // 視点人物の声が決まっていなければ、本文から読みとる
     selectedViewpoints = [];
     $("novelTitle").value = ""; $("novelBody").value = "";
     renderViewpointStrip();
