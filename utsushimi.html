@@ -786,7 +786,7 @@ function wpick(pairs){
 }
 
 const HAIR_LEN = [["bald",1],["veryShort",3],["short",5],["medium",5],["long",4],["veryLong",2]];
-const HAIR_LEN_JP = {bald:"髪はほとんどない", veryShort:"とても短い", short:"短い", medium:"肩につかない程度", long:"肩を越える長さ", veryLong:"腰にとどくほど長い"};
+const HAIR_LEN_JP = {bald:"坊主かスキンヘッド", veryShort:"とても短い", short:"短い", medium:"肩につかない程度", long:"肩を越える長さ", veryLong:"腰にとどくほど長い"};
 const HAIR_STYLE_JP = {down:"おろしている", ponytailLow:"低い位置でひとつに結んでいる", ponytailHigh:"高い位置でポニーテールに結んでいる", bun:"頭の上でお団子にまとめている", braid:"背中で三つ編みにしている", twin:"左右で二つに結んでいる"};
 /* 髪質：くせの出かた・毛の太さ・量。3番目の要素が 1 のものはファンタジー時のみ */
 const HAIR_TEXTURE = [
@@ -1698,6 +1698,16 @@ function portraitSVG(v){
     `<path d="${capOuter}${FRINGES[k]}" fill="${hair}" ${S}/>` + (k === "sheer" ? sheerStrands : "");
   const capShort =
     `<path d="M34,46 C 32,34 45,27 60,27 C 75,27 88,34 86,46 C 82,43 78,43 74,44 Q67,40 60,40 Q53,40 46,44 C 42,43 38,43 34,46 Z" fill="${hair}" ${S}/>`;
+  /* 剃りあげた頭。髪の毛ではなく、地肌に残る髪の色あととして塗る。
+     肌と髪をまぜた色を、こげ茶の輪郭線を引かずに置く（線を引くと髪に見えてしまう）。
+     生えぎわは capShort よりさらに高く、こめかみにはかからない。 */
+  const scalpMix = mix(skin, hair, 0.45);
+  /* 肌と髪が近い色（濃い肌に黒髪など）だと、剃りあとが肌に沈む。
+     明暗の差がつかないときは、肌そのものを暗くして跡を出す */
+  const scalp = Math.abs(lum(scalpMix) - lum(skin)) < 0.05 ? shade(skin, -0.09) : scalpMix;
+  const capBald =
+    `<path d="M36,43 C 34,33 45,27 60,27 C 75,27 86,33 84,43 C 80,40 76,39.5 72,40 Q66,37 60,37 Q54,37 48,40 C 44,39.5 40,40 36,43 Z"`
+    + ` fill="${scalp}" stroke="${shade(scalp, -0.1)}" stroke-width="0.8" stroke-linejoin="round"/>`;
   const braid = (cx, topY, seg) => {
     let o = `<ellipse cx="${cx}" cy="${topY}" rx="6.5" ry="5" fill="${hair}" ${St}/>`;
     for(let i=0;i<seg;i++){
@@ -1713,7 +1723,7 @@ function portraitSVG(v){
   // 後ろ髪・前髪・付属を組み立てる
   let hBack="", hFront="", hHang="", hUnder="", useCap=false;
   if(len==="bald"){
-    hFront = "";
+    hFront = capBald;
   }else if(len==="veryShort"){
     hFront = capShort;
   }else if(style==="down"){
