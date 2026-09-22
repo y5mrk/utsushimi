@@ -482,12 +482,15 @@
   <div class="sub">— 物語で間合いをはかる —</div>
   <div class="concept">
     <p>どこかに、小さな村があります。そこに、あなたの知らない3人が暮らしはじめます。</p>
+    <p>村人は一週間にひとりずつ、ふらりと増えていきます。</p>
     <p>だれが来るかは、あなたにも、わたしにも、決められません。名前も、性格も、過去も、一度あたえられたら二度と変更はできません。あなたはその人たちのそばに立って、起こることや感情や人間関係を想像し、物語として描きとめてください。</p>
-    <p>村人は一週間にひとりずつ、ふらりと増えていきます。彼らはあなたの物語を読んで、けれどあなたの物語の続きとしてではなく、やってきます。</p>
   </div>
 
   <label class="setToggle"><input type="checkbox" id="fantasySetup" checked><span>ファンタジー要素を含める</span></label>
   <p class="toggleNote">オンにすると、現実ばなれしたファンタジーな設定も含みます。</p>
+
+  <label class="setToggle"><input type="checkbox" id="jpVillageSetup"><span>日本の村にする</span></label>
+  <p class="toggleNote">オンにすると、村を日本の架空の村とし、村人の名前などの設定を日本風のものにそろえます。<br>オフにすると、文化圏・人種などの固定はなしです。</p>
 
   <button class="primary" id="startBtn">村をひらく</button>
 </div>
@@ -686,6 +689,14 @@
     </div>
 
     <div class="setSect">
+      <h3 class="setH3">
+        <label class="setToggle"><input type="checkbox" id="jpVillageToggle"><span>日本の村にする</span></label>
+      </h3>
+      <p class="setNote">オンのとき、この村を日本の架空の村とし、村人の名前などの設定を日本風のものにそろえます。オフのときは、文化圏・人種などの固定はなしです。</p>
+      <p class="setNote">※ この設定は、これから訪れる村人にだけはたらきます。すでに村にいる人たちは変わりません。</p>
+    </div>
+
+    <div class="setSect">
       <h3 class="setH3">データの持ち出しと読み込み</h3>
       <p class="setNote">村・物語・立ち絵をふくむすべてのデータを、ひとつのファイルに書き出せます。別のブラウザや端末で読み込めば、同じ村をそのまま続けられます。</p>
       <div class="setBtns">
@@ -734,7 +745,7 @@ let curVillager = -1;       // モーダルで開いている村人のindex
 let peekVillager = -1;      // 「物語をかく」の右側に出している村人のindex
 const VP_THIRD = -1;         // 視点人物のかわりに「三人称視点」をえらんだときの印
 const VP_THIRD_JP = "三人称視点";
-const AUTHOR_AI = "AI";     // 村人の語りの執筆者タグ（だれの視点かは視点人物タグのほうに記載）
+const AUTHOR_AI = "わたし"; // 村人の語りの執筆者タグ。「あなた」と対にする（だれの視点かは視点人物タグのほうに記載）
 let selectedViewpoints = []; // 執筆中に選択している視点人物（村人index、または VP_THIRD の配列）
 let activeTagFilters = [];   // 書きだめ帳の絞り込みに使う視点人物タグ（村人indexの配列）
 let activeAuthorFilters = []; // 書きだめ帳の絞り込みに使う執筆者タグ（"あなた"などの文字列の配列）
@@ -750,8 +761,9 @@ function load(){
     state.bonds = state.bonds || [];           // 縁はあとから足した項目
     state.bulletinLog = state.bulletinLog || [];
     state.voices = state.voices || {};         // 村人ごとの一人称・口調（語りはあとから足した項目）
-    (state.novels||[]).forEach(n => { if(n.aiWritten) n.author = AUTHOR_AI; });  // 執筆者タグを村人名から「AI」へ
+    (state.novels||[]).forEach(n => { if(n.aiWritten) n.author = AUTHOR_AI; });  // 執筆者タグを、いまの呼び名にそろえる
     state.fantasy = state.fantasy !== false;   // 旧データは「ファンタジーあり」として扱う
+    state.jpVillage = state.jpVillage === true;   // 日本の村にするかは、あとから足した項目。既定はオフ
     state.bulletinLog.sort((a,b) => a.date.localeCompare(b.date));
   }
 }
@@ -855,9 +867,37 @@ function isFantasy() {
   const box = $("fantasySetup");
   return box ? box.checked : true;
 }
+/* この村を日本の村にするか。既定はオフ（さまざまな文化圏のものが混ざる）。 */
+function isJpVillage() {
+  if (state) return state.jpVillage === true;
+  const box = $("jpVillageSetup");
+  return box ? box.checked : false;
+}
 /* ファンタジー限定の候補をのぞいて選ぶ */
-function huePick(table) {
-  return wpick(isFantasy() ? table : table.filter(x => !x[2]));
+/* 「日本の村にする」ときの髪色。ここに挙げた色だけこの重みで引き、
+   それ以外は、もとの重みを JP_RARE 倍にしてレアにする */
+const HAIR_HUE_JP = {
+  "黒": 4.5, "濡れ羽色": 2, "黒に近い焦げ茶": 2, "こげ茶": 4.5,
+  "明るい茶": 4.5, "栗色": 3.5, "赤茶": 2.5, "白髪まじり": 2
+};
+/* 「日本の村にする」ときの瞳の色。考えかたは髪と同じ */
+const EYE_HUE_JP = { "黒": 7, "こげ茶": 7, "明るい茶": 2.5 };
+/* 「日本の村にする」ときの肌の色。髪や瞳とちがい、抑えたい色だけを挙げる。
+   残りはもとの重みのまま（huePick の第3引数 keepRest） */
+const SKIN_HUE_JP = { "漆黒のように黒い肌": 0.005, "黒に近い褐色": 0.163, "濃い褐色": 0.163 };
+/* 一覧に無い色の重み（もとの重みに掛ける）。
+   0.36 で、ファンタジーOFFなら1色あたり25人に0.5人ほど出る */
+const JP_RARE = 0.36;
+/* jpMap を渡した表だけ、「日本の村にする」がオンのときに重みを差しかえる。
+   既定では、一覧に無い色は JP_RARE 倍にして激レアにする（髪・瞳）。
+   keepRest を立てると、一覧に無い色はそのままの重みで残る（肌のように、
+   一部の色だけ抑えたいとき） */
+function huePick(table, jpMap, keepRest) {
+  let t = isFantasy() ? table : table.filter(x => !x[2]);
+  if (jpMap && isJpVillage()) {
+    t = t.map(x => [x[0], jpMap[x[0]] !== undefined ? jpMap[x[0]] : (keepRest ? x[1] : x[1] * JP_RARE)]);
+  }
+  return wpick(t);
 }
 
 /* 年齢の出かた。1970年の人口ピラミッドのかたちをなぞる。
@@ -1063,9 +1103,9 @@ function makeConstraints(balanceAges){
   return {
     hairLength, hairStyle,
     hairTexture: huePick(HAIR_TEXTURE),
-    hairHue: huePick(HAIR_HUE),
-    eyeHue: huePick(EYE_HUE),
-    skinHue: huePick(SKIN_HUE),
+    hairHue: huePick(HAIR_HUE, HAIR_HUE_JP),
+    eyeHue: huePick(EYE_HUE, EYE_HUE_JP),
+    skinHue: huePick(SKIN_HUE, SKIN_HUE_JP, true),
     look: pickLook(ageN, fantasy),
     temper: wpick(TEMPER),
     social: wpick(SOCIAL),
@@ -1094,7 +1134,9 @@ function villagerSchema(withBonds){
   return `{
   "villagers": [
     {
-      "name": "名前（人種・国籍は自由。姓は不要。日本語風でない名前のときはカタカナで表記する）",
+      "name": ${isJpVillage()
+        ? '"名前（日本語の下の名前のみ。読み方の定まった、ふつうに使われている名前。原則として漢字。姓はつけない）"'
+        : '"名前（人種・国籍は自由。姓は不要。日本語風でない名前のときはカタカナで表記する）"'},
       "age": "年齢（乱数制約のとおり）",
       "appearance": {
         "hairColorName": "髪色の呼び名", "hairColorHex": "#rrggbb",
@@ -1128,9 +1170,12 @@ function commonRules() {
   const ageRule = fantasy
     ? "- age は乱数制約の「実年齢」をそのまま使うこと。人間ではありえない値でもよい。\n- apparentAge には、乱数制約の「見た目の年齢」に従って、何歳くらいに見えるかを具体的に書くこと。実年齢と見た目がずれる人物がいてよい（八十歳が四十代に見える、二十歳が老成して見える、など）。ずれるときは、なぜそう見えるのかが外見や気配から伝わるように otherFeatures にも反映すること。"
     : "- age は乱数制約の「実年齢」をそのまま使うこと。人間としてありうる値のみ。\n- apparentAge には、乱数制約の「見た目の年齢」に従って、何歳くらいに見えるかを具体的に書くこと。実年齢からかけ離れた見た目にはしないこと。";
+  const nameRule = isJpVillage()
+    ? "- 名前は、実在の日本人の下の名前として、ふつうに使われているものにすること。読み方がひととおりに定まっていて、はじめて見た人がそのまま読めるものだけにすること。当て字、めずらしい読ませかた、辞書を引かないと読めない漢字は使わないこと。\n- 姓（名字）はつけない。また、「狩野」「鶴巣」のような名字を、そのまま名前として使わないこと。カタカナの名前や、日本語以外の名前も使わないこと。\n- 名前はなるべく漢字で書くこと。漢字で表現しづらい名前の場合のみ、ひらがなの名前も許容する。\n- 年配の人に多い名前から、若い人に多い名前まで散らすこと。ただし、珍しさを狙わないこと。ありふれた名前でよい。"
+    : "- 名前は特定の人種・国籍に偏らせないこと。日本語風の名前ばかりにせず、さまざまな文化圏の名前をランダムに選ぶこと。名前を理由に人種を固定しないこと。日本語風でない名前のときは、その名前をカタカナで表記すること（例：「エルナ」「タヴィ」「ヨナス」）。";
   return `# 生成のルール
 ${worldRule}
-- 名前は特定の人種・国籍に偏らせないこと。日本語風の名前ばかりにせず、さまざまな文化圏の名前をランダムに選ぶこと。名前を理由に人種を固定しないこと。日本語風でない名前のときは、その名前をカタカナで表記すること（例：「エルナ」「タヴィ」「ヨナス」）。
+${nameRule}
 ${ageRule}
 - apparentAge は「二十代半ばに見える」「六十を過ぎたくらいに見える」のように、人間としてありうる年齢の言い方だけで書くこと。「人間でいうと」「人間にたとえると」といった前置きや、人外であることをほのめかす言い回しは書かないこと。
 - hairStyle は乱数制約で与えられた値をそのまま返し、外見の描写（otherFeatures など）にも矛盾しないように反映すること。\n- hairTexture も乱数制約の言葉をそのまま返すこと。髪のくせ・手ざわり・毛量として、otherFeatures や暮らしのふるまい（朝の手入れ、結うときの苦労など）に自然ににじませてよい。
@@ -2634,7 +2679,7 @@ function deleteNovel(id){
 }
 
 /* 執筆者タグ・視点人物タグをラベル付きで表示する。
-   執筆者はユーザー保存時は「あなた」、村人の語りは「AI」。だれの声で書かれたかは視点人物タグのほうに出る。
+   執筆者はユーザー保存時は「あなた」、村人の語りは「わたし」。だれの声で書かれたかは視点人物タグのほうに出る。
    どちらもこの画面からは変更不可。 */
 function tagsHTML(n){
   let html = `<span class="tagGroupLabel">執筆者：</span><span class="tagBadge author">${esc(n.author || "あなた")}</span>`;
@@ -3045,7 +3090,8 @@ $("startBtn").onclick = async () => {
   // 生成はすべてプロキシ経由の自動生成（APIキー不要）
   const mode = "api";
   const fantasy = $("fantasySetup").checked;
-  state = { mode, apiKey: "", villageName: null, villageDescription: "", villagers: [], novels: [], portraits: {}, bonds: [], voices: {}, fantasy, createdAt: Date.now(), lastVillagerAt: Date.now() };
+  const jpVillage = $("jpVillageSetup").checked;
+  state = { mode, apiKey: "", villageName: null, villageDescription: "", villagers: [], novels: [], portraits: {}, bonds: [], voices: {}, fantasy, jpVillage, createdAt: Date.now(), lastVillagerAt: Date.now() };
   $("startBtn").disabled = true;
   showLoading("村がうまれています");
   try{
@@ -3233,6 +3279,7 @@ document.querySelectorAll(".modalBack").forEach(m => m.onclick = e => {
 
 $("gear").onclick = () => {
   $("fantasyToggle").checked = isFantasy();
+  $("jpVillageToggle").checked = isJpVillage();
   syncRegenUI();
   openModal("settingsModal");
 };
@@ -3275,6 +3322,11 @@ $("fantasyToggle").onchange = (e) => {
   state.fantasy = e.target.checked;
   save();
   toast(e.target.checked ? "ファンタジー要素を含めます" : "以降はファンタジー要素を含みません");
+};
+$("jpVillageToggle").onchange = (e) => {
+  state.jpVillage = e.target.checked;
+  save();
+  toast(e.target.checked ? "これからは日本の村として書きます" : "これからは文化圏を問いません");
 };
 $("resetBtn").onclick = () => {
   if(!confirm("村と、書き溜めたすべての物語が消えます。よろしいですか？")) return;
